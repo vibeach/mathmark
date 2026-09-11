@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Nuova soluzione{% endblock %}
+{% block content %}
+
+<h1>Nuova soluzione</h1>
+<p class="sub">Fotografa la soluzione, scegli il problema (o creane uno nuovo), inserisci il nome dell'autore.</p>
+
+<form method="POST" enctype="multipart/form-data" id="new-form">
+
+  <div class="card">
+    <h3 style="margin-top:0">1 · Autore</h3>
+    <label>Nome di chi ha scritto la soluzione</label>
+    <input type="text" name="author_name" list="authors" required placeholder="Es. Marco Rossi" id="author-input" autocomplete="off">
+    <datalist id="authors">
+      {% for a in authors %}<option value="{{ a }}">{% endfor %}
+    </datalist>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">2 · Problema</h3>
+
+    <div style="display:flex; gap:10px; margin-bottom:14px;">
+      <button type="button" class="btn ghost" id="btn-existing" onclick="setMode('existing')">Riutilizza problema</button>
+      <button type="button" class="btn ghost" id="btn-new" onclick="setMode('new')">Nuovo problema</button>
+    </div>
+
+    <div id="mode-existing" style="display:none">
+      <label>Cerca tra i problemi esistenti</label>
+      <input type="text" id="problem-search" placeholder="Cerca per titolo o testo…" autocomplete="off">
+      <input type="hidden" name="problem_id" id="problem_id">
+      <div id="problem-results" style="margin-top:10px; max-height:300px; overflow-y:auto; border:1px solid var(--line); border-radius:6px; background:#fff;"></div>
+    </div>
+
+    <div id="mode-new">
+      <label>Titolo del problema (opzionale)</label>
+      <input type="text" name="problem_title" placeholder="Es. Equazione di secondo grado #1">
+      <label>Testo del problema</label>
+      <textarea name="problem_statement" rows="4" placeholder="Es. Risolvi l'equazione: $x^2 - 5x + 6 = 0$ &#10;&#10;Suggerimento: puoi usare LaTeX inline con $...$ e block con $$...$$"></textarea>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div>
+          <label>Categoria (opzionale)</label>
+          <input type="text" name="problem_category" placeholder="algebra, geometria, analisi…">
+        </div>
+        <div>
+          <label>Difficoltà (opzionale)</label>
+          <select name="problem_difficulty">
+            <option value="">—</option>
+            <option>facile</option>
+            <option>media</option>
+            <option>difficile</option>
+            <option>molto difficile</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">3 · Foto della soluzione</h3>
+    <label>Scatta o carica una foto</label>
+    <input type="file" name="image" accept="image/*" capture="environment" required id="img-input">
+    <div id="img-preview" style="margin-top:12px;"></div>
+    <p class="sub" style="margin-top:12px;">Suggerimento: assicurati che la scrittura sia chiara e ben illuminata. Formato max: 20 MB (jpg, png, webp).</p>
+  </div>
+
+  <button type="submit" class="btn gold" id="submit-btn" style="font-size:16px; padding:14px 28px;">
+    ➤ Invia per valutazione
+  </button>
+
+</form>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setMode(m) {
+  document.getElementById("mode-existing").style.display = m==="existing" ? "" : "none";
+  document.getElementById("mode-new").style.display = m==="new" ? "" : "none";
+  document.getElementById("btn-existing").style.background = m==="existing"?"var(--brand)":"transparent";
+  document.getElementById("btn-existing").style.color = m==="existing"?"#fff":"var(--brand)";
+  document.getElementById("btn-new").style.background = m==="new"?"var(--brand)":"transparent";
+  document.getElementById("btn-new").style.color = m==="new"?"#fff":"var(--brand)";
+  // Toggle required
+  const ta = document.querySelector("textarea[name='problem_statement']");
+  if (ta) ta.required = (m==="new");
+  document.getElementById("problem_id").value = "";
+}
+setMode("new");
+
+// Autocomplete
+const searchInput = document.getElementById("problem-search");
+const resultsDiv = document.getElementById("problem-results");
+let searchTimer;
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const q = searchInput.value.trim();
+    if (q.length < 2) { resultsDiv.innerHTML = ""; return; }
+    const res = await fetch("/api/problems?q=" + encodeURIComponent(q));
+    const data = await res.json();
+    if (!data.length) { resultsDiv.innerHTML = "<div style='padding:12px; color:var(--muted); font-size:13px;'>Nessun problema trovato.</div>"; return; }
+    resultsDiv.innerHTML = data.map(p => `
+      <div class="pr-item" data-id="${p.id}" style="padding:10px 14px; border-bottom:1px solid var(--line); cursor:pointer;">
+        <div style="font-weight:600">${escapeHtml(p.title)}</div>
+        <div style="color:var(--muted); font-size:13px;">${escapeHtml(p.statement.slice(0,120))}${p.statement.length>120?'…':''}</div>
+      </div>
+    `).join("");
+    document.querySelectorAll(".pr-item").forEach(el => {
+      el.onclick = () => {
+        document.querySelectorAll(".pr-item").forEach(x => x.style.background = "");
+        el.style.background = "var(--paper-2)";
+        document.getElementById("problem_id").value = el.dataset.id;
+      };
+    });
+  }, 200);
+});
+
+// Image preview
+document.getElementById("img-input").addEventListener("change", (ev) => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  document.getElementById("img-preview").innerHTML = `
+    <img src="${url}" style="max-width:100%; max-height:300px; border-radius:6px; border:1px solid var(--line);">
+    <div class="sub" style="margin-top:6px;">${(f.size/1024/1024).toFixed(2)} MB · ${f.type}</div>
+  `;
+});
+
+// Submit UX
+document.getElementById("new-form").addEventListener("submit", (e) => {
+  const btn = document.getElementById("submit-btn");
+  btn.disabled = true; btn.textContent = "⏳ Invio + analisi in corso…";
+});
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+</script>
+{% endblock %}

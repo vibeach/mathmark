@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Problemi{% endblock %}
+{% block content %}
+
+<h1>Catalogo problemi</h1>
+<p class="sub">Tutti i problemi con almeno una soluzione valutata.</p>
+
+{% if problems %}
+<div class="card" style="padding:0">
+<table>
+  <thead><tr>
+    <th>#</th><th>Titolo</th><th>Categoria</th><th>Difficoltà</th>
+    <th>Soluzioni</th><th>Punteggio medio</th>
+  </tr></thead>
+  <tbody>
+  {% for p in problems %}
+  <tr>
+    <td><a href="{{ url_for('problem_detail', pid=p.id) }}">#{{ p.id }}</a></td>
+    <td><a href="{{ url_for('problem_detail', pid=p.id) }}">{{ p.title|truncate(60) }}</a></td>
+    <td>{{ p.category or "—" }}</td>
+    <td>{{ p.difficulty or "—" }}</td>
+    <td>{{ p.sub_count }}</td>
+    <td>{% if p.avg_score is not none %}<b>{{ p.avg_score }}</b>/100{% else %}—{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:40px; color:var(--muted);">
+  Nessun problema ancora.
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Soluzione #{{ sub.id }}{% endblock %}
+{% block content %}
+
+<div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+  <h1 style="margin:0">Soluzione #{{ sub.id }}</h1>
+  <div class="sub">di <a href="{{ url_for('author_detail', name=sub.author_name) }}"><b>{{ sub.author_name }}</b></a>
+       · {{ sub.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Problema</h3>
+  <div style="font-weight:600; margin-bottom:8px;">
+    <a href="{{ url_for('problem_detail', pid=sub.problem_id) }}">{{ sub.problem_title }}</a>
+  </div>
+  <div style="white-space:pre-wrap; line-height:1.7; padding:12px; background:var(--paper-2); border-radius:6px;">{{ sub.problem_statement }}</div>
+  {% if sub.category or sub.difficulty %}
+  <div style="margin-top:10px; font-family:-apple-system,sans-serif; font-size:12px; color:var(--muted);">
+    {% if sub.category %}Categoria: <b>{{ sub.category }}</b>{% endif %}
+    {% if sub.difficulty %} · Difficoltà: <b>{{ sub.difficulty }}</b>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;" class="grid-detail">
+  <div class="card">
+    <h3 style="margin-top:0">Foto della soluzione</h3>
+    <img src="{{ url_for('submission_image', sid=sub.id) }}" style="width:100%; border-radius:6px; border:1px solid var(--line);">
+    <div class="sub" style="margin-top:8px;">{{ (sub.image_size or 0)/1024 | round(1) }} KB · {{ sub.image_mimetype }}</div>
+  </div>
+
+  <div class="card" id="mark-card">
+    <h3 style="margin-top:0">Valutazione</h3>
+    <div id="mark-content">
+      {% if not mark or mark.status == 'pending' %}
+      <div style="text-align:center; padding:30px 10px;">
+        <div class="spinner" style="width:36px; height:36px; margin:0 auto 16px; border:3px solid var(--line); border-top-color:var(--brand); border-radius:50%; animation:spin .8s linear infinite;"></div>
+        <div style="font-family:-apple-system,sans-serif; color:var(--muted); font-size:14px;" id="progress-text">
+          Analisi in corso… <span id="dots">…</span>
+        </div>
+      </div>
+      {% elif mark.status == 'failed' %}
+      <div style="padding:20px; background:#fee2e2; color:#991b1b; border-radius:6px;">
+        <b>Valutazione fallita</b>
+        <div style="margin-top:6px; font-size:13px;">{{ mark.error }}</div>
+      </div>
+      {% else %}
+        {% include "_mark_result.html" %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width:800px) { .grid-detail { grid-template-columns:1fr; } }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if not mark or mark.status == 'pending' %}
+// Poll status
+const stages = [
+  "Analisi in corso… lettura scrittura",
+  "Analisi in corso… verifica passaggi",
+  "Analisi in corso… valutazione finale",
+  "Analisi in corso… quasi pronto"
+];
+let stage = 0;
+setInterval(() => {
+  const t = document.getElementById("progress-text");
+  if (t) t.textContent = stages[stage % stages.length];
+  stage++;
+}, 3500);
+
+async function poll() {
+  try {
+    const r = await fetch("/api/mark_status/{{ sub.id }}");
+    if (r.ok) {
+      const d = await r.json();
+      if (d.status && d.status !== "pending") {
+        location.reload();
+        return;
+      }
+    }
+  } catch(e){}
+  setTimeout(poll, 2500);
+}
+poll();
+{% endif %}
+</script>
+{% endblock %}

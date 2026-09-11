@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}MathMark{% endblock %} · MathMark</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1a2f6b">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+        onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false}]})"></script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%231a2f6b'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle' fill='%23e8c96c' font-family='Georgia'%3E∑%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --ink: #0f172a;
+    --paper: #f7f5ef;
+    --paper-2: #efeadb;
+    --brand: #1a2f6b;
+    --brand-2: #2c4a9c;
+    --gold: #b8892e;
+    --muted: #64748b;
+    --line: #d6cfba;
+    --success: #16a34a;
+    --warn: #d97706;
+    --danger: #dc2626;
+    --card: #ffffff;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:var(--paper); color:var(--ink);
+    font-family: "Iowan Old Style","Palatino Linotype",Georgia,serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased; }
+  a { color:var(--brand); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  header {
+    background:var(--brand); color:#fff;
+    padding:16px 22px; border-bottom:4px solid var(--gold);
+    position:sticky; top:0; z-index:20;
+  }
+  header .inner { max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:20px; }
+  header .brand { font-family:Georgia,serif; font-size:22px; font-weight:700; letter-spacing:.03em; }
+  header .brand em { color:var(--gold); font-style:normal; }
+  header nav { display:flex; gap:16px; font-family:-apple-system,"Helvetica Neue",sans-serif; font-size:14px; margin-left:auto; }
+  header nav a { color:#fff; opacity:.85; }
+  header nav a:hover { opacity:1; text-decoration:none; border-bottom:1px solid var(--gold); }
+  main { max-width:1080px; margin:0 auto; padding:24px 22px 60px; }
+  h1 { font-family:Georgia,serif; font-size:32px; margin:0 0 8px; color:var(--brand); }
+  h2 { font-family:Georgia,serif; font-size:22px; margin:24px 0 12px; color:var(--brand); border-bottom:2px solid var(--gold); padding-bottom:6px; }
+  h3 { font-family:Georgia,serif; font-size:18px; margin:16px 0 8px; }
+  .sub { color:var(--muted); font-size:14px; }
+  .btn {
+    display:inline-block; padding:11px 20px; background:var(--brand); color:#fff;
+    border:none; border-radius:6px; font-family:inherit; font-size:15px; cursor:pointer;
+    text-decoration:none; transition: all .15s;
+  }
+  .btn:hover { background:var(--brand-2); text-decoration:none; }
+  .btn.gold { background:var(--gold); color:#000; }
+  .btn.gold:hover { background:#a37827; }
+  .btn.ghost { background:transparent; color:var(--brand); border:1px solid var(--brand); }
+  .btn.ghost:hover { background:var(--brand); color:#fff; }
+  input, textarea, select {
+    width:100%; padding:11px 14px; font-family:inherit; font-size:15px;
+    border:1px solid var(--line); border-radius:6px; background:#fff;
+    transition: border-color .15s;
+  }
+  input:focus, textarea:focus, select:focus { outline:none; border-color:var(--brand); }
+  label { display:block; font-family:-apple-system,sans-serif; font-size:12px; font-weight:600;
+    letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin:16px 0 6px; }
+  .card {
+    background:var(--card); border:1px solid var(--line); border-radius:8px;
+    padding:20px 22px; margin-bottom:16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 18px; }
+  .stat .n { font-family:Georgia,serif; font-size:32px; font-weight:700; color:var(--brand); line-height:1; }
+  .stat .l { font-family:-apple-system,sans-serif; font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--muted); margin-top:8px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:14px; }
+  th { font-family:-apple-system,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); font-weight:600; }
+  .badge {
+    display:inline-block; padding:3px 10px; font-size:11px; font-weight:600;
+    border-radius:4px; letter-spacing:.05em; font-family:-apple-system,sans-serif;
+  }
+  .badge.pending { background:#fbbf24; color:#78350f; }
+  .badge.done    { background:#dcfce7; color:#166534; }
+  .badge.failed  { background:#fee2e2; color:#991b1b; }
+  .badge.verdict-corretta { background:#dcfce7; color:#166534; }
+  .badge.verdict-parzialmente { background:#fef3c7; color:#78350f; }
+  .badge.verdict-errata { background:#fee2e2; color:#991b1b; }
+  .badge.verdict-illeggibile { background:#e5e7eb; color:#4b5563; }
+  .score-big { font-family:Georgia,serif; font-size:56px; font-weight:700; line-height:1; color:var(--brand); }
+  .score-big.low { color:var(--danger); }
+  .score-big.mid { color:var(--warn); }
+  .score-big.high { color:var(--success); }
+  footer { text-align:center; padding:30px 22px; color:var(--muted); font-size:12px;
+    font-family:-apple-system,sans-serif; border-top:1px solid var(--line); margin-top:40px; }
+  @media (max-width:700px) {
+    .stat-row { grid-template-columns:repeat(2,1fr); }
+    header .brand { font-size:18px; }
+    h1 { font-size:24px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <a href="{{ url_for('home') }}" class="brand" style="color:#fff">Math<em>Mark</em></a>
+    <nav>
+      <a href="{{ url_for('home') }}">Recenti</a>
+      <a href="{{ url_for('problems_index') }}">Problemi</a>
+      <a href="{{ url_for('new') }}" style="background:var(--gold); color:#000; padding:6px 14px; border-radius:4px;">＋ Nuovo</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+{% block content %}{% endblock %}
+</main>
+
+<footer>
+  MathMark · valutazione automatica soluzioni matematiche · powered by Claude
+</footer>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

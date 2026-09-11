@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Recenti{% endblock %}
+{% block content %}
+
+<h1>Recenti</h1>
+<p class="sub">Valutazioni automatiche delle soluzioni. Fotografa la soluzione, il sistema riconosce e valuta.</p>
+
+<div class="stat-row">
+  <div class="stat"><div class="n">{{ n_subs }}</div><div class="l">soluzioni</div></div>
+  <div class="stat"><div class="n">{{ n_probs }}</div><div class="l">problemi</div></div>
+  <div class="stat"><div class="n">{{ n_auth }}</div><div class="l">autori</div></div>
+  <div class="stat"><div class="n">{{ avg or "–" }}</div><div class="l">punteggio medio</div></div>
+</div>
+
+<div style="margin:24px 0">
+  <a href="{{ url_for('new') }}" class="btn gold">＋ Aggiungi soluzione</a>
+</div>
+
+<h2>Ultime valutazioni</h2>
+
+{% if subs %}
+<div class="card" style="padding:0">
+<table>
+  <thead><tr>
+    <th>#</th><th>Autore</th><th>Problema</th><th>Punteggio</th><th>Verdetto</th><th>Stato</th>
+  </tr></thead>
+  <tbody>
+  {% for s in subs %}
+  <tr>
+    <td><a href="{{ url_for('submission_detail', sid=s.id) }}">#{{ s.id }}</a></td>
+    <td><a href="{{ url_for('author_detail', name=s.author_name) }}">{{ s.author_name }}</a></td>
+    <td>{{ s.problem_title|truncate(50) }}</td>
+    <td>{% if s.score is not none %}<b>{{ s.score }}</b>/100{% else %}—{% endif %}</td>
+    <td>{% if s.verdict %}<span class="badge verdict-{{ s.verdict.split(' ')[0].lower() }}">{{ s.verdict }}</span>{% else %}—{% endif %}</td>
+    <td><span class="badge {{ s.status or 'pending' }}">{{ s.status or 'pending' }}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:40px 22px; color:var(--muted);">
+  Nessuna soluzione ancora — sarà tua!
+  <br><br>
+  <a href="{{ url_for('new') }}" class="btn">Inserisci la prima</a>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,69 @@
+{% set fb = mark.feedback_json or {} %}
+
+<div style="text-align:center; margin-bottom:16px;">
+  <div class="score-big {% if mark.score is not none %}{% if mark.score < 50 %}low{% elif mark.score < 75 %}mid{% else %}high{% endif %}{% endif %}">
+    {{ mark.score if mark.score is not none else "–" }}<span style="font-size:22px; color:var(--muted);">/100</span>
+  </div>
+  {% if mark.verdict %}
+  <div style="margin-top:8px;">
+    <span class="badge verdict-{{ mark.verdict.split(' ')[0].lower() }}" style="font-size:13px; padding:6px 14px;">{{ mark.verdict }}</span>
+  </div>
+  {% endif %}
+  {% if fb.confidence %}
+  <div class="sub" style="margin-top:6px; font-family:-apple-system,sans-serif; font-size:11px; letter-spacing:.15em; text-transform:uppercase;">
+    Confidenza lettura: {{ fb.confidence }}
+  </div>
+  {% endif %}
+</div>
+
+{% if fb.steps_correct is not none and fb.steps_total %}
+<div style="display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--paper-2); border-radius:6px; font-family:-apple-system,sans-serif; font-size:13px; margin-bottom:14px;">
+  <span>Passaggi corretti: <b>{{ fb.steps_correct }}/{{ fb.steps_total }}</b></span>
+  {% if fb.final_answer_correct is not none %}
+  <span style="margin-left:auto;">
+    Risultato finale:
+    {% if fb.final_answer_correct %}<b style="color:var(--success);">✓ corretto</b>
+    {% else %}<b style="color:var(--danger);">✗ errato</b>{% endif %}
+  </span>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if fb.overall_feedback %}
+<div style="padding:14px; background:#eff6ff; border-left:4px solid var(--brand); border-radius:4px; margin-bottom:14px; font-style:italic;">
+  {{ fb.overall_feedback }}
+</div>
+{% endif %}
+
+{% if fb.strengths %}
+<div style="margin-top:16px;">
+  <h4 style="color:var(--success); font-family:-apple-system,sans-serif; font-size:12px; letter-spacing:.24em; text-transform:uppercase; margin-bottom:8px;">Punti di forza</h4>
+  <ul style="padding-left:20px; margin:0;">
+    {% for s in fb.strengths %}<li style="margin:4px 0;">{{ s }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if fb.errors %}
+<div style="margin-top:16px;">
+  <h4 style="color:var(--danger); font-family:-apple-system,sans-serif; font-size:12px; letter-spacing:.24em; text-transform:uppercase; margin-bottom:8px;">Errori rilevati</h4>
+  <ul style="padding-left:20px; margin:0;">
+    {% for e in fb.errors %}<li style="margin:4px 0;">{{ e }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if fb.suggestions %}
+<div style="margin-top:16px;">
+  <h4 style="color:var(--warn); font-family:-apple-system,sans-serif; font-size:12px; letter-spacing:.24em; text-transform:uppercase; margin-bottom:8px;">Suggerimenti</h4>
+  <ul style="padding-left:20px; margin:0;">
+    {% for s in fb.suggestions %}<li style="margin:4px 0;">{{ s }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--line); font-family:-apple-system,sans-serif; font-size:11px; color:var(--muted); display:flex; justify-content:space-between;">
+  <span>Modello: {{ mark.model }}</span>
+  {% if mark.latency_ms %}<span>{{ mark.latency_ms }} ms</span>{% endif %}
+  {% if mark.cost_usd %}<span>${{ "%.4f"|format(mark.cost_usd) }}</span>{% endif %}
+</div>
