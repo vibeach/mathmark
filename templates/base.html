@@ -28,18 +28,19 @@
   * { box-sizing:border-box; }
   html,body { margin:0; padding:0; background:var(--paper); color:var(--ink);
     font-family: "Iowan Old Style","Palatino Linotype",Georgia,serif;
-    line-height:1.55; -webkit-font-smoothing:antialiased; }
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+    overflow-x:hidden; }
   a { color:var(--brand); text-decoration:none; }
   a:hover { text-decoration:underline; }
   header {
     background:var(--brand); color:#fff;
-    padding:16px 22px; border-bottom:4px solid var(--gold);
+    padding:14px 18px; border-bottom:4px solid var(--gold);
     position:sticky; top:0; z-index:20;
   }
-  header .inner { max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:20px; }
+  header .inner { max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap; row-gap:8px; }
   header .brand { font-family:Georgia,serif; font-size:22px; font-weight:700; letter-spacing:.03em; }
   header .brand em { color:var(--gold); font-style:normal; }
-  header nav { display:flex; gap:16px; font-family:-apple-system,"Helvetica Neue",sans-serif; font-size:14px; margin-left:auto; }
+  header nav { display:flex; gap:12px; font-family:-apple-system,"Helvetica Neue",sans-serif; font-size:14px; margin-left:auto; flex-wrap:wrap; align-items:center; }
   header nav a { color:#fff; opacity:.85; }
   header nav a:hover { opacity:1; text-decoration:none; border-bottom:1px solid var(--gold); }
   main { max-width:1080px; margin:0 auto; padding:24px 22px 60px; }
@@ -74,9 +75,11 @@
   .stat { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 18px; }
   .stat .n { font-family:Georgia,serif; font-size:32px; font-weight:700; color:var(--brand); line-height:1; }
   .stat .l { font-family:-apple-system,sans-serif; font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--muted); margin-top:8px; }
+  .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   table { width:100%; border-collapse:collapse; margin-top:8px; }
-  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:14px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:top; }
   th { font-family:-apple-system,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); font-weight:600; }
+  td.wrap-cell { max-width:220px; overflow-wrap:anywhere; }
   .badge {
     display:inline-block; padding:3px 10px; font-size:11px; font-weight:600;
     border-radius:4px; letter-spacing:.05em; font-family:-apple-system,sans-serif;
@@ -101,6 +104,23 @@
     .stat-row { grid-template-columns:repeat(2,1fr); }
     header .brand { font-size:18px; }
     h1 { font-size:24px; }
+    main { padding:16px 14px 40px; }
+    .card { padding:16px; }
+  }
+  @media (max-width:480px) {
+    .stat-row { grid-template-columns:repeat(2,1fr); gap:10px; }
+    .stat { padding:12px 14px; }
+    .stat .n { font-size:26px; }
+    .stat .l { font-size:10px; letter-spacing:.18em; }
+    header .inner { gap:10px; }
+    header nav { font-size:13px; gap:10px; width:100%; margin-left:0; justify-content:flex-start; }
+    header nav a[style*="gold"] { padding:4px 10px !important; }
+    h1 { font-size:22px; }
+    h2 { font-size:18px; }
+    label { margin:14px 0 4px; }
+    input, textarea, select { padding:9px 12px; font-size:15px; }
+    .btn { padding:10px 16px; font-size:14px; }
+    th, td { padding:8px 10px; font-size:13px; }
   }
 </style>
 </head>
@@ -111,6 +131,7 @@
     <a href="{{ url_for('home') }}" class="brand" style="color:#fff">Math<em>{{ t.brand_tail }}</em></a>
     <nav>
       <a href="{{ url_for('home') }}">{{ t.nav_recent }}</a>
+      <a href="{{ url_for('submissions_index') }}">{{ t.nav_submissions }}</a>
       <a href="{{ url_for('problems_index') }}">{{ t.nav_problems }}</a>
       <a href="{{ url_for('new') }}" style="background:var(--gold); color:#000; padding:6px 14px; border-radius:4px;">{{ t.nav_new }}</a>
       <span class="lang-switch">

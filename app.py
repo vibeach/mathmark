@@ -323,6 +323,25 @@ TEXT = {
         "verdict_partial": "partially correct",
         "verdict_wrong": "wrong",
         "verdict_illegible": "illegible",
+        "nav_submissions": "All",
+        "view_all_subs": "View all submissions →",
+        "subs_title": "All submissions",
+        "subs_sub": "Every submission ever graded. Click any row to open the full AI review.",
+        "subs_search_ph": "Search by title, statement or author…",
+        "subs_filter_author": "Author",
+        "subs_filter_verdict": "Verdict",
+        "subs_filter_status": "Status",
+        "subs_filter_lang": "Feedback language",
+        "subs_filter_all": "All",
+        "subs_reset": "Reset filters",
+        "subs_apply": "Apply",
+        "subs_page_of": "Page {page} of {pages}",
+        "subs_total": "{n} submissions",
+        "subs_prev": "← Previous",
+        "subs_next": "Next →",
+        "st_pending": "pending",
+        "st_done": "done",
+        "st_failed": "failed",
     },
     "ru": {
         "html_lang": "ru",
@@ -416,6 +435,25 @@ TEXT = {
         "verdict_partial": "частично правильно",
         "verdict_wrong": "неверно",
         "verdict_illegible": "нечитаемо",
+        "nav_submissions": "Все",
+        "view_all_subs": "Все работы →",
+        "subs_title": "Все работы",
+        "subs_sub": "Все отправленные работы. Нажмите на строку, чтобы открыть полный разбор от ИИ.",
+        "subs_search_ph": "Поиск по названию, условию или автору…",
+        "subs_filter_author": "Автор",
+        "subs_filter_verdict": "Вердикт",
+        "subs_filter_status": "Статус",
+        "subs_filter_lang": "Язык проверки",
+        "subs_filter_all": "Все",
+        "subs_reset": "Сбросить фильтры",
+        "subs_apply": "Применить",
+        "subs_page_of": "Стр. {page} из {pages}",
+        "subs_total": "{n} работ",
+        "subs_prev": "← Назад",
+        "subs_next": "Вперёд →",
+        "st_pending": "в ожидании",
+        "st_done": "готово",
+        "st_failed": "ошибка",
     },
 }
 
@@ -620,6 +658,72 @@ def submission_status(sid):
         cur.execute("SELECT status, score, verdict FROM markings WHERE submission_id=%s", (sid,))
         row = cur.fetchone()
     return jsonify(row or {"status":"unknown"})
+
+@app.route("/submissions")
+def submissions_index():
+    conn = get_conn()
+    q = request.args.get("q","").strip()
+    author = request.args.get("author","").strip()
+    verdict = request.args.get("verdict","").strip()  # canonical: correct|partial|wrong|illegible
+    status = request.args.get("status","").strip()    # pending|done|failed
+    lang_f = request.args.get("submission_lang","").strip()
+    page = max(1, int(request.args.get("page", 1) or 1))
+    per_page = 25
+    where = ["1=1"]
+    params = []
+    if q:
+        where.append("(LOWER(p.title) LIKE %s OR LOWER(p.statement) LIKE %s OR LOWER(s.author_name) LIKE %s)")
+        needle = f"%{q.lower()}%"
+        params += [needle, needle, needle]
+    if author:
+        where.append("s.author_name = %s")
+        params.append(author)
+    if verdict:
+        where.append("""
+          CASE
+            WHEN m.feedback_json ? 'verdict_code' THEN m.feedback_json->>'verdict_code'
+            WHEN LOWER(SPLIT_PART(COALESCE(m.verdict,''),' ',1)) IN ('corretta','correct','правильно','верно') THEN 'correct'
+            WHEN LOWER(SPLIT_PART(COALESCE(m.verdict,''),' ',1)) IN ('parzialmente','partial','partially','частично') THEN 'partial'
+            WHEN LOWER(SPLIT_PART(COALESCE(m.verdict,''),' ',1)) IN ('errata','wrong','incorrect','неверно','неправильно') THEN 'wrong'
+            WHEN LOWER(SPLIT_PART(COALESCE(m.verdict,''),' ',1)) IN ('illeggibile','illegible','нечитаемо') THEN 'illegible'
+            ELSE ''
+          END = %s
+        """)
+        params.append(verdict)
+    if status:
+        where.append("COALESCE(m.status,'pending') = %s")
+        params.append(status)
+    if lang_f:
+        where.append("COALESCE(s.language,'en') = %s")
+        params.append(lang_f)
+    where_sql = " AND ".join(where)
+    with conn.cursor() as cur:
+        cur.execute(f"""
+            SELECT COUNT(*) c FROM submissions s
+            JOIN problems p ON p.id=s.problem_id
+            LEFT JOIN markings m ON m.submission_id=s.id
+            WHERE {where_sql}
+        """, params)
+        total = cur.fetchone()["c"]
+        cur.execute(f"""
+            SELECT s.id, s.author_name, s.created_at, s.language,
+                   p.title AS problem_title,
+                   m.status, m.score, m.verdict, m.feedback_json
+            FROM submissions s
+            JOIN problems p ON p.id=s.problem_id
+            LEFT JOIN markings m ON m.submission_id=s.id
+            WHERE {where_sql}
+            ORDER BY s.id DESC
+            LIMIT %s OFFSET %s
+        """, params + [per_page, (page-1)*per_page])
+        subs = cur.fetchall()
+        cur.execute("SELECT DISTINCT author_name FROM submissions ORDER BY author_name")
+        authors = [r["author_name"] for r in cur.fetchall()]
+    pages = max(1, (total + per_page - 1) // per_page)
+    return render_template("submissions.html",
+        subs=subs, authors=authors,
+        q=q, author=author, verdict=verdict, status=status, submission_lang=lang_f,
+        page=page, pages=pages, total=total)
 
 @app.route("/problems")
 def problems_index():

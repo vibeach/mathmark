@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}{{ t.subs_title }}{% endblock %}
+{% block content %}
+
+<h1>{{ t.subs_title }}</h1>
+<p class="sub">{{ t.subs_sub }} · {{ t.subs_total.replace("{n}", total|string) }}</p>
+
+<form method="GET" class="card" style="margin-bottom:16px;">
+  <div style="display:grid; grid-template-columns:2fr 1fr 1fr 1fr 1fr; gap:10px;" class="filters">
+    <div>
+      <label>&nbsp;</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="{{ t.subs_search_ph }}">
+    </div>
+    <div>
+      <label>{{ t.subs_filter_author }}</label>
+      <select name="author">
+        <option value="">{{ t.subs_filter_all }}</option>
+        {% for a in authors %}
+          <option value="{{ a }}" {% if a == author %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>{{ t.subs_filter_verdict }}</label>
+      <select name="verdict">
+        <option value="">{{ t.subs_filter_all }}</option>
+        <option value="correct" {% if verdict=='correct' %}selected{% endif %}>{{ t.verdict_correct }}</option>
+        <option value="partial" {% if verdict=='partial' %}selected{% endif %}>{{ t.verdict_partial }}</option>
+        <option value="wrong" {% if verdict=='wrong' %}selected{% endif %}>{{ t.verdict_wrong }}</option>
+        <option value="illegible" {% if verdict=='illegible' %}selected{% endif %}>{{ t.verdict_illegible }}</option>
+      </select>
+    </div>
+    <div>
+      <label>{{ t.subs_filter_status }}</label>
+      <select name="status">
+        <option value="">{{ t.subs_filter_all }}</option>
+        <option value="pending" {% if status=='pending' %}selected{% endif %}>{{ t.st_pending }}</option>
+        <option value="done" {% if status=='done' %}selected{% endif %}>{{ t.st_done }}</option>
+        <option value="failed" {% if status=='failed' %}selected{% endif %}>{{ t.st_failed }}</option>
+      </select>
+    </div>
+    <div>
+      <label>{{ t.subs_filter_lang }}</label>
+      <select name="submission_lang">
+        <option value="">{{ t.subs_filter_all }}</option>
+        <option value="en" {% if submission_lang=='en' %}selected{% endif %}>EN</option>
+        <option value="ru" {% if submission_lang=='ru' %}selected{% endif %}>RU</option>
+        <option value="it" {% if submission_lang=='it' %}selected{% endif %}>IT</option>
+      </select>
+    </div>
+  </div>
+  <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+    <button type="submit" class="btn">{{ t.subs_apply }}</button>
+    <a href="{{ url_for('submissions_index') }}" class="btn ghost">{{ t.subs_reset }}</a>
+  </div>
+</form>
+
+{% if subs %}
+<div class="sub-list">
+  {% for s in subs %}
+  {% set fb = s.feedback_json or {} %}
+  {% set vcode = fb.verdict_code or verdict_class(s.verdict) %}
+  <a class="sub-card" href="{{ url_for('submission_detail', sid=s.id) }}">
+    <div class="sc-head">
+      <div class="sc-id">#{{ s.id }}</div>
+      <div class="sc-score {% if s.score is not none %}{% if s.score < 50 %}low{% elif s.score < 75 %}mid{% else %}high{% endif %}{% endif %}">
+        {{ s.score if s.score is not none else "–" }}<span class="sub" style="font-size:12px;">/100</span>
+      </div>
+    </div>
+    <div class="sc-meta">
+      <span class="sub">{{ s.author_name }}</span> ·
+      <span class="sub">{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+      · <span class="badge lang-badge">{{ (s.language or 'en').upper() }}</span>
+    </div>
+    <div class="sc-title">{{ s.problem_title|truncate(90) }}</div>
+    <div class="sc-tags">
+      {% if s.verdict %}<span class="badge verdict-{{ vcode }}">{{ s.verdict }}</span>{% endif %}
+      <span class="badge {{ s.status or 'pending' }}">{{ s.status or 'pending' }}</span>
+      {% if fb.confidence %}<span class="badge conf-badge">{{ t.mark_confidence }} {{ fb.confidence }}</span>{% endif %}
+    </div>
+    {% if fb.overall_feedback %}
+    <div class="sc-quote">"{{ fb.overall_feedback|truncate(180) }}"</div>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:40px; color:var(--muted);">{{ t.no_subs }}</div>
+{% endif %}
+
+{% if pages > 1 %}
+<div style="margin-top:24px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+  {% set qs = 'q=' ~ q|urlencode ~ '&author=' ~ author|urlencode ~ '&verdict=' ~ verdict ~ '&status=' ~ status ~ '&submission_lang=' ~ submission_lang %}
+  <div>
+    {% if page > 1 %}<a class="btn ghost" href="?{{ qs }}&page={{ page-1 }}">{{ t.subs_prev }}</a>{% endif %}
+  </div>
+  <div class="sub">{{ t.subs_page_of.replace("{page}", page|string).replace("{pages}", pages|string) }}</div>
+  <div>
+    {% if page < pages %}<a class="btn ghost" href="?{{ qs }}&page={{ page+1 }}">{{ t.subs_next }}</a>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<style>
+.sub-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:14px; }
+.sub-card {
+  display:block; background:#fff; border:1px solid var(--line); border-radius:8px;
+  padding:16px 18px; text-decoration:none; color:inherit;
+  transition:border-color .12s, box-shadow .12s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03);
+}
+.sub-card:hover { border-color:var(--brand); box-shadow: 0 4px 12px rgba(26,47,107,.12); text-decoration:none; }
+.sc-head { display:flex; justify-content:space-between; align-items:baseline; }
+.sc-id { font-family:-apple-system,sans-serif; font-size:12px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
+.sc-score { font-family:Georgia,serif; font-size:26px; font-weight:700; color:var(--brand); line-height:1; }
+.sc-score.low { color:var(--danger); }
+.sc-score.mid { color:var(--warn); }
+.sc-score.high { color:var(--success); }
+.sc-meta { font-size:12px; color:var(--muted); margin-top:6px; font-family:-apple-system,sans-serif; }
+.sc-title { margin-top:10px; font-weight:600; line-height:1.4; }
+.sc-tags { margin-top:10px; display:flex; gap:6px; flex-wrap:wrap; }
+.badge.lang-badge { background:var(--paper-2); color:var(--muted); }
+.badge.conf-badge { background:#eff6ff; color:var(--brand); text-transform:none; letter-spacing:0; }
+.sc-quote { margin-top:12px; padding:10px 12px; background:#eff6ff; border-left:3px solid var(--brand); border-radius:0 4px 4px 0; font-style:italic; font-size:14px; line-height:1.5; }
+@media (max-width:700px) {
+  .filters { grid-template-columns:1fr 1fr !important; }
+}
+@media (max-width:480px) {
+  .filters { grid-template-columns:1fr !important; }
+  .sub-list { grid-template-columns:1fr; }
+}
+</style>
+
+{% endblock %}

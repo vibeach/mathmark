@@ -18,6 +18,7 @@
 
 {% if subs %}
 <div class="card" style="padding:0">
+<div class="table-wrap">
 <table>
   <thead><tr>
     <th>{{ t.table_id }}</th><th>{{ t.table_author }}</th><th>{{ t.table_date }}</th><th>{{ t.table_score }}</th><th>{{ t.table_verdict }}</th><th>{{ t.table_status }}</th>
@@ -35,6 +36,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 </div>
 {% else %}
 <div class="card" style="text-align:center; padding:40px; color:var(--muted);">{{ t.no_subs }}</div>

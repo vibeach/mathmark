@@ -7,6 +7,7 @@
 
 {% if problems %}
 <div class="card" style="padding:0">
+<div class="table-wrap">
 <table>
   <thead><tr>
     <th>{{ t.problem_id }}</th><th>{{ t.problem_title_col }}</th><th>{{ t.problem_category }}</th><th>{{ t.problem_difficulty }}</th>
@@ -25,6 +26,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 </div>
 {% else %}
 <div class="card" style="text-align:center; padding:40px; color:var(--muted);">
