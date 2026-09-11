@@ -9,6 +9,12 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, R
 import psycopg
 from psycopg.rows import dict_row
 import anthropic
+from PIL import Image, ImageOps
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except Exception:
+    pass
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB per upload
@@ -147,6 +153,39 @@ Schema:
 }}
 
 Respond with ONLY the JSON object, no markdown fences, no extra text."""
+
+GEMINI_ACCEPTED = ("image/jpeg","image/png","image/webp","image/gif")
+
+def normalize_image(data: bytes, claimed_mime: str | None):
+    """Ensure the image is decodable + in a Gemini-accepted mime.
+
+    - Convert HEIC/HEIF and anything unrecognized to JPEG.
+    - Rotate per EXIF, strip metadata, cap max side at 2000px.
+    - Return (bytes, mime).
+    """
+    try:
+        img = Image.open(io.BytesIO(data))
+        img = ImageOps.exif_transpose(img)
+        fmt = (img.format or "").upper()
+        max_side = 2000
+        if max(img.size) > max_side:
+            img.thumbnail((max_side, max_side), Image.LANCZOS)
+        if fmt in ("JPEG","PNG","WEBP","GIF"):
+            out = io.BytesIO()
+            mime = {"JPEG":"image/jpeg","PNG":"image/png","WEBP":"image/webp","GIF":"image/gif"}[fmt]
+            save_kwargs = {"quality": 88, "optimize": True} if fmt == "JPEG" else {}
+            if img.mode not in ("RGB","RGBA","L") and fmt != "PNG":
+                img = img.convert("RGB")
+            img.save(out, fmt, **save_kwargs)
+            return out.getvalue(), mime
+        # Anything else (HEIC/HEIF/TIFF/BMP/...) → JPEG
+        if img.mode != "RGB": img = img.convert("RGB")
+        out = io.BytesIO()
+        img.save(out, "JPEG", quality=88, optimize=True)
+        return out.getvalue(), "image/jpeg"
+    except Exception:
+        mime = claimed_mime if claimed_mime in GEMINI_ACCEPTED else "image/jpeg"
+        return data, mime
 
 def _parse_json(raw: str):
     """Extract first {...} block from raw model output, stripping markdown fences."""
@@ -603,9 +642,7 @@ def new():
 
         image_bytes = image.read()
         if len(image_bytes) > 20*1024*1024: return tt["err_image_too_big"], 400
-        mimetype = image.mimetype or "image/jpeg"
-        if mimetype not in ("image/jpeg","image/png","image/webp","image/gif"):
-            mimetype = "image/jpeg"
+        image_bytes, mimetype = normalize_image(image_bytes, image.mimetype)
 
         with conn.cursor() as cur:
             if problem_id:
