@@ -127,17 +127,62 @@ searchInput.addEventListener("input", () => {
   }, 200);
 });
 
-document.getElementById("img-input").addEventListener("change", (ev) => {
-  const f = ev.target.files[0];
-  if (!f) return;
+async function compressIfLarge(file) {
+  if (!file || !file.type.startsWith("image/")) return file;
+  if (file.size < 1500 * 1024) return file;
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = URL.createObjectURL(file);
+    });
+    const maxSide = 1800;
+    let { width, height } = img;
+    if (Math.max(width, height) > maxSide) {
+      const s = maxSide / Math.max(width, height);
+      width = Math.round(width * s);
+      height = Math.round(height * s);
+    }
+    const c = document.createElement("canvas");
+    c.width = width; c.height = height;
+    c.getContext("2d").drawImage(img, 0, 0, width, height);
+    const blob = await new Promise(r => c.toBlob(r, "image/jpeg", 0.85));
+    if (!blob) return file;
+    return new File([blob], (file.name || "photo").replace(/\.(png|heic|webp|gif|heif)$/i, ".jpg"), { type: "image/jpeg" });
+  } catch (e) {
+    console.warn("compress failed, sending original", e);
+    return file;
+  }
+}
+
+let _compressedFile = null;
+
+document.getElementById("img-input").addEventListener("change", async (ev) => {
+  const raw = ev.target.files[0];
+  if (!raw) return;
+  const preview = document.getElementById("img-preview");
+  preview.innerHTML = `<div class="sub">${(raw.size/1024/1024).toFixed(2)} MB · preparing…</div>`;
+  const f = await compressIfLarge(raw);
+  _compressedFile = f;
   const url = URL.createObjectURL(f);
-  document.getElementById("img-preview").innerHTML = `
+  const shrank = f !== raw;
+  preview.innerHTML = `
     <img src="${url}" style="max-width:100%; max-height:300px; border-radius:6px; border:1px solid var(--line);">
-    <div class="sub" style="margin-top:6px;">${(f.size/1024/1024).toFixed(2)} MB · ${f.type}</div>
+    <div class="sub" style="margin-top:6px;">
+      ${(f.size/1024/1024).toFixed(2)} MB · ${f.type}
+      ${shrank ? ` <span style="color:var(--success);">(compressed from ${(raw.size/1024/1024).toFixed(2)} MB)</span>` : ""}
+    </div>
   `;
 });
 
 document.getElementById("new-form").addEventListener("submit", (e) => {
+  const input = document.getElementById("img-input");
+  if (_compressedFile && input.files[0] && _compressedFile !== input.files[0]) {
+    const dt = new DataTransfer();
+    dt.items.add(_compressedFile);
+    input.files = dt.files;
+  }
   const btn = document.getElementById("submit-btn");
   btn.disabled = true; btn.textContent = T.submitting;
 });
