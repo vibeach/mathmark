@@ -330,10 +330,42 @@ def mark_solution_gemini(problem_text, image_data, mimetype, lang="it"):
         return {"error": f"{type(e).__name__}: {e}"}, int((time.time()-t0)*1000), None, 0
 
 def mark_solution(problem_text: str, image_data: bytes, mimetype: str, lang: str = "it"):
-    """Dispatch to Claude or Gemini based on MODEL env."""
+    """Dispatch to Claude or Gemini based on MODEL env, sanitize output."""
     if MODEL.startswith("gemini"):
-        return mark_solution_gemini(problem_text, image_data, mimetype, lang)
-    return mark_solution_claude(problem_text, image_data, mimetype, lang)
+        data, latency, raw, cost = mark_solution_gemini(problem_text, image_data, mimetype, lang)
+    else:
+        data, latency, raw, cost = mark_solution_claude(problem_text, image_data, mimetype, lang)
+    return _sanitize_marking(data), latency, raw, cost
+
+def _sanitize_marking(data):
+    """Defensive clamp of LLM output before it hits the DB."""
+    if not isinstance(data, dict) or data.get("error"):
+        return data
+    try:
+        # score: clamp 0-100
+        s = data.get("score")
+        if s is not None:
+            s = int(round(float(s)))
+            data["score"] = max(0, min(100, s))
+        # steps: non-negative ints
+        for k in ("steps_correct","steps_total"):
+            v = data.get(k)
+            if v is not None:
+                data[k] = max(0, int(round(float(v))))
+        # steps_correct never exceeds steps_total
+        if data.get("steps_total") is not None and data.get("steps_correct") is not None:
+            data["steps_correct"] = min(data["steps_correct"], data["steps_total"])
+        # verdict_code: canonical
+        vc = (data.get("verdict_code") or "").lower().strip()
+        if vc not in ("correct","partial","wrong","illegible"):
+            data["verdict_code"] = verdict_class(data.get("verdict",""))
+        # coerce list-shaped fields to lists
+        for k in ("strengths","errors","suggestions"):
+            if k in data and not isinstance(data[k], list):
+                data[k] = [str(data[k])] if data[k] else []
+    except Exception:
+        pass
+    return data
 
 # ────────────────────────────────────────────────────────
 # UI i18n
