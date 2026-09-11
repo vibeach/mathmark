@@ -163,7 +163,12 @@ def mark_solution_gemini(problem_text, image_data, mimetype):
             {"inline_data":{"mime_type":mimetype,"data":b64}},
             {"text": MARKING_PROMPT.format(problem=problem_text)},
         ]}],
-        "generationConfig":{"temperature":0.2,"maxOutputTokens":2000,"responseMimeType":"application/json"}
+        "generationConfig":{
+            "temperature":0.2,
+            "maxOutputTokens":8192,
+            "responseMimeType":"application/json",
+            "thinkingConfig":{"thinkingBudget":2048},
+        },
     }).encode()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={GEMINI_KEY}"
     try:
@@ -171,14 +176,19 @@ def mark_solution_gemini(problem_text, image_data, mimetype):
         with urllib.request.urlopen(req, timeout=120) as r:
             d = json.loads(r.read())
         latency = int((time.time()-t0)*1000)
-        raw = d["candidates"][0]["content"]["parts"][0]["text"]
+        cand = (d.get("candidates") or [{}])[0]
+        finish = cand.get("finishReason")
+        parts = (cand.get("content") or {}).get("parts") or []
+        raw = "".join(p.get("text","") for p in parts if isinstance(p, dict))
+        if not raw:
+            block = d.get("promptFeedback", {}).get("blockReason")
+            return {"error": f"empty response (finishReason={finish}, block={block})"}, latency, json.dumps(d)[:2000], 0
         data = _parse_json(raw)
         usage = d.get("usageMetadata", {})
-        # Gemini 2.5 Pro pricing ~$1.25/1M in, $5/1M out (Sep 2026)
         cost = (usage.get("promptTokenCount",0) * 1.25 + usage.get("candidatesTokenCount",0) * 5) / 1_000_000
         return data, latency, raw, cost
     except Exception as e:
-        return {"error": str(e)}, int((time.time()-t0)*1000), None, 0
+        return {"error": f"{type(e).__name__}: {e}"}, int((time.time()-t0)*1000), None, 0
 
 def mark_solution(problem_text: str, image_data: bytes, mimetype: str):
     """Dispatch to Claude or Gemini based on MODEL env."""
