@@ -79,10 +79,11 @@ def init_db():
     conn.close()
 
 # ────────────────────────────────────────────────────────
-# Claude marking
+# LLM marking (Claude Opus OR Gemini 2.5 Pro)
 # ────────────────────────────────────────────────────────
 ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY","")
-MODEL = os.environ.get("MARK_MODEL", "claude-opus-4-7")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY","")
+MODEL = os.environ.get("MARK_MODEL", "gemini-2.5-pro")
 
 MARKING_PROMPT = """Sei un esperto insegnante di matematica. Devi valutare la soluzione manoscritta di uno studente al problema qui sotto.
 
@@ -115,53 +116,75 @@ MARKING_PROMPT = """Sei un esperto insegnante di matematica. Devi valutare la so
 
 Ricorda: rispondi SOLO con il JSON, senza wrappers markdown, senza spiegazioni aggiuntive."""
 
-def mark_solution(problem_text: str, image_data: bytes, mimetype: str):
-    """Send to Claude Opus vision, return marking dict + metadata."""
-    if not ANTHROPIC_KEY:
-        return {"error":"ANTHROPIC_API_KEY not set"}, 0, None
+def _parse_json(raw: str):
+    """Extract first {...} block from raw model output, stripping markdown fences."""
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("```", 2)[1]
+        if cleaned.startswith("json"): cleaned = cleaned[4:]
+        cleaned = cleaned.rsplit("```", 1)[0].strip()
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        import re
+        m = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if m: return json.loads(m.group(0))
+        raise
 
+def mark_solution_claude(problem_text, image_data, mimetype):
+    if not ANTHROPIC_KEY:
+        return {"error":"ANTHROPIC_API_KEY not set"}, 0, None, 0
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
     t0 = time.time()
     b64 = base64.standard_b64encode(image_data).decode("ascii")
-
     try:
         msg = client.messages.create(
-            model=MODEL,
-            max_tokens=2000,
-            temperature=0.2,
-            messages=[{
-                "role":"user",
-                "content":[
-                    {"type":"image","source":{"type":"base64","media_type":mimetype,"data":b64}},
-                    {"type":"text","text": MARKING_PROMPT.format(problem=problem_text)},
-                ]
-            }]
-        )
-        latency_ms = int((time.time()-t0)*1000)
+            model=MODEL, max_tokens=2000, temperature=0.2,
+            messages=[{"role":"user","content":[
+                {"type":"image","source":{"type":"base64","media_type":mimetype,"data":b64}},
+                {"type":"text","text": MARKING_PROMPT.format(problem=problem_text)},
+            ]}])
+        latency = int((time.time()-t0)*1000)
         raw = "".join(b.text for b in msg.content if hasattr(b,"text"))
-        # Parse JSON — strip markdown fences if any
-        cleaned = raw.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("```",2)[1]
-            if cleaned.startswith("json"): cleaned = cleaned[4:]
-            cleaned = cleaned.rsplit("```",1)[0].strip()
-        try:
-            data = json.loads(cleaned)
-        except Exception as pe:
-            # Try extracting first {...} block
-            import re
-            m = re.search(r"\{.*\}", cleaned, re.DOTALL)
-            if m:
-                data = json.loads(m.group(0))
-            else:
-                return {"error": f"JSON parse failed: {pe}", "raw": raw}, latency_ms, raw
-        # Cost estimate (Claude Opus pricing ~$15/1M in, $75/1M out, plus image tokens)
-        in_tok = msg.usage.input_tokens
-        out_tok = msg.usage.output_tokens
-        cost = (in_tok * 15 + out_tok * 75) / 1_000_000
-        return data, latency_ms, raw, cost
+        data = _parse_json(raw)
+        cost = (msg.usage.input_tokens * 15 + msg.usage.output_tokens * 75) / 1_000_000
+        return data, latency, raw, cost
     except Exception as e:
         return {"error": str(e)}, int((time.time()-t0)*1000), None, 0
+
+def mark_solution_gemini(problem_text, image_data, mimetype):
+    if not GEMINI_KEY:
+        return {"error":"GEMINI_API_KEY not set"}, 0, None, 0
+    import urllib.request
+    t0 = time.time()
+    b64 = base64.standard_b64encode(image_data).decode("ascii")
+    body = json.dumps({
+        "contents":[{"parts":[
+            {"inline_data":{"mime_type":mimetype,"data":b64}},
+            {"text": MARKING_PROMPT.format(problem=problem_text)},
+        ]}],
+        "generationConfig":{"temperature":0.2,"maxOutputTokens":2000,"responseMimeType":"application/json"}
+    }).encode()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={GEMINI_KEY}"
+    try:
+        req = urllib.request.Request(url, data=body, headers={"Content-Type":"application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            d = json.loads(r.read())
+        latency = int((time.time()-t0)*1000)
+        raw = d["candidates"][0]["content"]["parts"][0]["text"]
+        data = _parse_json(raw)
+        usage = d.get("usageMetadata", {})
+        # Gemini 2.5 Pro pricing ~$1.25/1M in, $5/1M out (Sep 2026)
+        cost = (usage.get("promptTokenCount",0) * 1.25 + usage.get("candidatesTokenCount",0) * 5) / 1_000_000
+        return data, latency, raw, cost
+    except Exception as e:
+        return {"error": str(e)}, int((time.time()-t0)*1000), None, 0
+
+def mark_solution(problem_text: str, image_data: bytes, mimetype: str):
+    """Dispatch to Claude or Gemini based on MODEL env."""
+    if MODEL.startswith("gemini"):
+        return mark_solution_gemini(problem_text, image_data, mimetype)
+    return mark_solution_claude(problem_text, image_data, mimetype)
 
 # ────────────────────────────────────────────────────────
 # Async marking worker
@@ -184,12 +207,7 @@ def process_submission(submission_id: int):
             mimetype = row["image_mimetype"]
             problem = row["statement"]
 
-        result = mark_solution(problem, image, mimetype)
-        if len(result) == 4:
-            data, latency_ms, raw, cost = result
-        else:
-            data, latency_ms, raw = result
-            cost = 0
+        data, latency_ms, raw, cost = mark_solution(problem, image, mimetype)
 
         with conn.cursor() as cur:
             if data.get("error"):
