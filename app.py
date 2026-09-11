@@ -209,6 +209,21 @@ Respond with ONLY the JSON object, no markdown fences, no extra text."""
 
 GEMINI_ACCEPTED = ("image/jpeg","image/png","image/webp","image/gif")
 
+def _title_from_statement(s: str, max_len: int = 80) -> str:
+    """First line, collapsed whitespace, cut on word boundary, LaTeX-safe."""
+    first = (s.strip().splitlines() or [""])[0].strip()
+    first = " ".join(first.split())
+    if len(first) <= max_len:
+        return first or (s[:max_len].strip() or "Untitled")
+    cut = first[:max_len]
+    # avoid cutting inside a $...$ pair
+    if cut.count("$") % 2 == 1:
+        idx = cut.rfind("$")
+        if idx > 0: cut = cut[:idx].rstrip()
+    space = cut.rfind(" ")
+    if space > max_len // 2: cut = cut[:space]
+    return (cut.rstrip(" ,.;:") + "…") if cut else "Untitled"
+
 def normalize_image(data: bytes, claimed_mime: str | None):
     """Ensure the image is decodable + in a Gemini-accepted mime.
 
@@ -442,6 +457,11 @@ TEXT = {
         "regrade_confirm": "Re-run grading on this solution?",
         "regrade_running": "Re-grading…",
         "err_rate_limit": "Too many submissions. Try again in",
+        "err_author_too_long": "Author name too long (max 120 chars)",
+        "err_title_too_long": "Problem title too long (max 200 chars)",
+        "err_statement_too_long": "Problem statement too long (max 4000 chars)",
+        "copy_link": "Copy link",
+        "copied": "Copied!",
     },
     "ru": {
         "html_lang": "ru",
@@ -558,6 +578,11 @@ TEXT = {
         "regrade_confirm": "Запустить проверку заново?",
         "regrade_running": "Проверка…",
         "err_rate_limit": "Слишком много запросов. Попробуйте через",
+        "err_author_too_long": "Имя автора слишком длинное (макс. 120 симв.)",
+        "err_title_too_long": "Название задачи слишком длинное (макс. 200 симв.)",
+        "err_statement_too_long": "Условие задачи слишком длинное (макс. 4000 симв.)",
+        "copy_link": "Копировать ссылку",
+        "copied": "Скопировано!",
     },
 }
 
@@ -698,6 +723,11 @@ def new():
             return (f"{tt['err_rate_limit']} ({mins} min)", 429)
         if not author: return tt["err_author_missing"], 400
         if not image or not image.filename: return tt["err_image_missing"], 400
+        if len(author) > 120: return tt["err_author_too_long"], 400
+        if len(problem_title) > 200: return tt["err_title_too_long"], 400
+        if len(problem_statement) > 4000: return tt["err_statement_too_long"], 400
+        if len(problem_category or "") > 80: problem_category = problem_category[:80]
+        if len(problem_difficulty or "") > 40: problem_difficulty = problem_difficulty[:40]
 
         image_bytes = image.read()
         if len(image_bytes) > 20*1024*1024: return tt["err_image_too_big"], 400
@@ -712,7 +742,7 @@ def new():
                 if not problem_statement: return tt["err_statement_missing"], 400
                 cur.execute("""INSERT INTO problems (title, statement, category, difficulty)
                                VALUES (%s,%s,%s,%s) RETURNING id""",
-                            (problem_title or problem_statement[:80],
+                            (problem_title or _title_from_statement(problem_statement),
                              problem_statement, problem_category, problem_difficulty))
                 pid = cur.fetchone()["id"]
 

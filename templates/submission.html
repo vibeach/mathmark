@@ -4,8 +4,11 @@
 
 <div style="display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px;">
   <h1 style="margin:0">{{ t.sub_title }} #{{ sub.id }}</h1>
-  <div class="sub">{{ t.sub_author }}: <a href="{{ url_for('author_detail', name=sub.author_name) }}"><b>{{ sub.author_name }}</b></a>
+  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+    <div class="sub">{{ t.sub_author }}: <a href="{{ url_for('author_detail', name=sub.author_name) }}"><b>{{ sub.author_name }}</b></a>
        · {{ sub.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+    <button type="button" class="btn ghost" id="copy-link-btn" style="font-size:11px; padding:5px 10px;">&#128279; {{ t.copy_link }}</button>
+  </div>
 </div>
 
 <div class="card">
@@ -89,6 +92,20 @@ async function poll() {
 }
 poll();
 {% endif %}
+
+const clb = document.getElementById("copy-link-btn");
+if (clb) {
+  clb.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      const orig = clb.textContent;
+      clb.textContent = {{ t.copied|tojson }};
+      setTimeout(() => { clb.textContent = orig; }, 1600);
+    } catch(e) {
+      prompt("Copy this URL:", location.href);
+    }
+  });
+}
 
 document.querySelectorAll("#regrade-btn, #regrade-btn-failed").forEach(rg => {
   rg.addEventListener("click", async () => {
