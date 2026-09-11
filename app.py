@@ -86,6 +86,37 @@ def init_db():
         conn.commit()
     conn.close()
 
+_RECOVERY_LOCK = threading.Lock()
+_RECOVERED = False
+
+def recover_stalled_markings():
+    """On startup, re-kick any marking that's been pending too long.
+
+    Deploys and worker restarts orphan the background threads, leaving
+    submissions stuck at `pending` forever. Any row older than 90s is
+    a good candidate for re-processing.
+    """
+    global _RECOVERED
+    with _RECOVERY_LOCK:
+        if _RECOVERED: return
+        _RECOVERED = True
+    try:
+        conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT submission_id FROM markings
+                WHERE status='pending'
+                  AND NOW() - COALESCE(updated_at, created_at) > INTERVAL '90 seconds'
+                ORDER BY submission_id
+                LIMIT 20
+            """)
+            stalled = [r["submission_id"] for r in cur.fetchall()]
+        conn.close()
+        for sid in stalled:
+            kick_worker(sid)
+    except Exception as e:
+        print(f"[recover_stalled_markings] {e}", flush=True)
+
 # ────────────────────────────────────────────────────────
 # LLM marking (Claude Opus OR Gemini 2.5 Pro)
 # ────────────────────────────────────────────────────────
@@ -837,9 +868,13 @@ def submission_regrade(sid):
     with conn.cursor() as cur:
         cur.execute("SELECT id FROM submissions WHERE id=%s", (sid,))
         if not cur.fetchone(): abort(404)
-        cur.execute("SELECT status FROM markings WHERE submission_id=%s", (sid,))
+        cur.execute("""
+            SELECT status, EXTRACT(EPOCH FROM (NOW() - COALESCE(updated_at, created_at))) age_s
+            FROM markings WHERE submission_id=%s
+        """, (sid,))
         m = cur.fetchone()
-        if m and m["status"] == "pending":
+        # Refuse only if a marking is actively in-flight (pending < 60s).
+        if m and m["status"] == "pending" and (m["age_s"] or 0) < 60:
             return jsonify({"ok": False, "reason": "already pending"}), 409
         cur.execute("""INSERT INTO markings (submission_id, model, status)
                        VALUES (%s,%s,'pending')
@@ -869,11 +904,13 @@ def healthz():
 
 if __name__ == "__main__":
     init_db()
+    recover_stalled_markings()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
 else:
     # init on import for gunicorn
     try:
         init_db()
+        recover_stalled_markings()
     except Exception as e:
-        print(f"init_db failed: {e}")
+        print(f"startup failed: {e}")
