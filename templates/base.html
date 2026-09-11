@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it">
+<html lang="{{ t.html_lang }}">
 <head>
 <meta charset="utf-8">
 <title>{% block title %}MathMark{% endblock %} · MathMark</title>
@@ -84,10 +84,13 @@
   .badge.pending { background:#fbbf24; color:#78350f; }
   .badge.done    { background:#dcfce7; color:#166534; }
   .badge.failed  { background:#fee2e2; color:#991b1b; }
-  .badge.verdict-corretta { background:#dcfce7; color:#166534; }
-  .badge.verdict-parzialmente { background:#fef3c7; color:#78350f; }
-  .badge.verdict-errata { background:#fee2e2; color:#991b1b; }
-  .badge.verdict-illeggibile { background:#e5e7eb; color:#4b5563; }
+  .badge.verdict-correct { background:#dcfce7; color:#166534; }
+  .badge.verdict-partial { background:#fef3c7; color:#78350f; }
+  .badge.verdict-wrong { background:#fee2e2; color:#991b1b; }
+  .badge.verdict-illegible { background:#e5e7eb; color:#4b5563; }
+  .lang-switch { display:flex; gap:6px; margin-left:14px; }
+  .lang-switch a { padding:4px 8px; border-radius:4px; font-size:12px; opacity:.7; }
+  .lang-switch a.active { background:var(--gold); color:#000; opacity:1; }
   .score-big { font-family:Georgia,serif; font-size:56px; font-weight:700; line-height:1; color:var(--brand); }
   .score-big.low { color:var(--danger); }
   .score-big.mid { color:var(--warn); }
@@ -105,11 +108,16 @@
 
 <header>
   <div class="inner">
-    <a href="{{ url_for('home') }}" class="brand" style="color:#fff">Math<em>Mark</em></a>
+    <a href="{{ url_for('home') }}" class="brand" style="color:#fff">Math<em>{{ t.brand_tail }}</em></a>
     <nav>
-      <a href="{{ url_for('home') }}">Recenti</a>
-      <a href="{{ url_for('problems_index') }}">Problemi</a>
-      <a href="{{ url_for('new') }}" style="background:var(--gold); color:#000; padding:6px 14px; border-radius:4px;">＋ Nuovo</a>
+      <a href="{{ url_for('home') }}">{{ t.nav_recent }}</a>
+      <a href="{{ url_for('problems_index') }}">{{ t.nav_problems }}</a>
+      <a href="{{ url_for('new') }}" style="background:var(--gold); color:#000; padding:6px 14px; border-radius:4px;">{{ t.nav_new }}</a>
+      <span class="lang-switch">
+        {% for code in UI_LANGS %}
+          <a href="{{ url_for('set_lang', code=code, next=request.full_path) }}" class="{{ 'active' if lang==code else '' }}">{{ code.upper() }}</a>
+        {% endfor %}
+      </span>
     </nav>
   </div>
 </header>
@@ -119,7 +127,7 @@
 </main>
 
 <footer>
-  MathMark · valutazione automatica soluzioni matematiche · powered by Claude
+  {{ t.footer }}
 </footer>
 
 {% block scripts %}{% endblock %}

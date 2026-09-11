@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Problemi{% endblock %}
+{% block title %}{{ t.nav_problems }}{% endblock %}
 {% block content %}
 
-<h1>Catalogo problemi</h1>
-<p class="sub">Tutti i problemi con almeno una soluzione valutata.</p>
+<h1>{{ t.problems_title }}</h1>
+<p class="sub">{{ t.problems_sub }}</p>
 
 {% if problems %}
 <div class="card" style="padding:0">
 <table>
   <thead><tr>
-    <th>#</th><th>Titolo</th><th>Categoria</th><th>Difficoltà</th>
-    <th>Soluzioni</th><th>Punteggio medio</th>
+    <th>{{ t.problem_id }}</th><th>{{ t.problem_title_col }}</th><th>{{ t.problem_category }}</th><th>{{ t.problem_difficulty }}</th>
+    <th>{{ t.problem_subs }}</th><th>{{ t.problem_avg }}</th>
   </tr></thead>
   <tbody>
   {% for p in problems %}
@@ -28,7 +28,7 @@
 </div>
 {% else %}
 <div class="card" style="text-align:center; padding:40px; color:var(--muted);">
-  Nessun problema ancora.
+  {{ t.no_subs }}
 </div>
 {% endif %}
 

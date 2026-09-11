@@ -4,17 +4,17 @@
 
 <h1>{{ name }}</h1>
 <p class="sub">
-  Soluzioni valutate: <b>{{ stats.c or 0 }}</b> ·
-  Punteggio medio: <b>{{ stats.avg or "—" }}</b>{% if stats.avg %}/100{% endif %}
+  {{ t.author_stats_c }} <b>{{ stats.c or 0 }}</b> ·
+  {{ t.author_stats_avg }} <b>{{ stats.avg or "—" }}</b>{% if stats.avg %}/100{% endif %}
 </p>
 
-<h2>Storico soluzioni</h2>
+<h2>{{ t.author_history_h }}</h2>
 
 {% if subs %}
 <div class="card" style="padding:0">
 <table>
   <thead><tr>
-    <th>#</th><th>Problema</th><th>Data</th><th>Punteggio</th><th>Verdetto</th><th>Stato</th>
+    <th>{{ t.table_id }}</th><th>{{ t.table_problem }}</th><th>{{ t.table_date }}</th><th>{{ t.table_score }}</th><th>{{ t.table_verdict }}</th><th>{{ t.table_status }}</th>
   </tr></thead>
   <tbody>
   {% for s in subs %}
@@ -23,7 +23,7 @@
     <td>{{ s.problem_title|truncate(60) }}</td>
     <td>{{ s.created_at.strftime('%d/%m/%Y') }}</td>
     <td>{% if s.score is not none %}<b>{{ s.score }}</b>/100{% else %}—{% endif %}</td>
-    <td>{% if s.verdict %}<span class="badge verdict-{{ s.verdict.split(' ')[0].lower() }}">{{ s.verdict }}</span>{% endif %}</td>
+    <td>{% if s.verdict %}<span class="badge verdict-{{ verdict_class(s.verdict) }}">{{ s.verdict }}</span>{% endif %}</td>
     <td><span class="badge {{ s.status or 'pending' }}">{{ s.status or 'pending' }}</span></td>
   </tr>
   {% endfor %}
@@ -31,7 +31,7 @@
 </table>
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:40px; color:var(--muted);">Nessuna soluzione ancora.</div>
+<div class="card" style="text-align:center; padding:40px; color:var(--muted);">{{ t.no_subs }}</div>
 {% endif %}
 
 {% endblock %}

@@ -1,28 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Recenti{% endblock %}
+{% block title %}{{ t.nav_recent }}{% endblock %}
 {% block content %}
 
-<h1>Recenti</h1>
-<p class="sub">Valutazioni automatiche delle soluzioni. Fotografa la soluzione, il sistema riconosce e valuta.</p>
+<h1>{{ t.home_title }}</h1>
+<p class="sub">{{ t.home_sub }}</p>
 
 <div class="stat-row">
-  <div class="stat"><div class="n">{{ n_subs }}</div><div class="l">soluzioni</div></div>
-  <div class="stat"><div class="n">{{ n_probs }}</div><div class="l">problemi</div></div>
-  <div class="stat"><div class="n">{{ n_auth }}</div><div class="l">autori</div></div>
-  <div class="stat"><div class="n">{{ avg or "–" }}</div><div class="l">punteggio medio</div></div>
+  <div class="stat"><div class="n">{{ n_subs }}</div><div class="l">{{ t.stat_submissions }}</div></div>
+  <div class="stat"><div class="n">{{ n_probs }}</div><div class="l">{{ t.stat_problems }}</div></div>
+  <div class="stat"><div class="n">{{ n_auth }}</div><div class="l">{{ t.stat_authors }}</div></div>
+  <div class="stat"><div class="n">{{ avg or "–" }}</div><div class="l">{{ t.stat_avg }}</div></div>
 </div>
 
 <div style="margin:24px 0">
-  <a href="{{ url_for('new') }}" class="btn gold">＋ Aggiungi soluzione</a>
+  <a href="{{ url_for('new') }}" class="btn gold">{{ t.nav_new }}</a>
 </div>
-
-<h2>Ultime valutazioni</h2>
 
 {% if subs %}
 <div class="card" style="padding:0">
 <table>
   <thead><tr>
-    <th>#</th><th>Autore</th><th>Problema</th><th>Punteggio</th><th>Verdetto</th><th>Stato</th>
+    <th>{{ t.table_id }}</th><th>{{ t.table_author }}</th><th>{{ t.table_problem }}</th><th>{{ t.table_score }}</th><th>{{ t.table_verdict }}</th><th>{{ t.table_status }}</th>
   </tr></thead>
   <tbody>
   {% for s in subs %}
@@ -31,7 +29,7 @@
     <td><a href="{{ url_for('author_detail', name=s.author_name) }}">{{ s.author_name }}</a></td>
     <td>{{ s.problem_title|truncate(50) }}</td>
     <td>{% if s.score is not none %}<b>{{ s.score }}</b>/100{% else %}—{% endif %}</td>
-    <td>{% if s.verdict %}<span class="badge verdict-{{ s.verdict.split(' ')[0].lower() }}">{{ s.verdict }}</span>{% else %}—{% endif %}</td>
+    <td>{% if s.verdict %}<span class="badge verdict-{{ verdict_class(s.verdict) }}">{{ s.verdict }}</span>{% else %}—{% endif %}</td>
     <td><span class="badge {{ s.status or 'pending' }}">{{ s.status or 'pending' }}</span></td>
   </tr>
   {% endfor %}
@@ -40,9 +38,9 @@
 </div>
 {% else %}
 <div class="card" style="text-align:center; padding:40px 22px; color:var(--muted);">
-  Nessuna soluzione ancora — sarà tua!
+  {{ t.no_subs }}
   <br><br>
-  <a href="{{ url_for('new') }}" class="btn">Inserisci la prima</a>
+  <a href="{{ url_for('new') }}" class="btn">{{ t.nav_new }}</a>
 </div>
 {% endif %}
 

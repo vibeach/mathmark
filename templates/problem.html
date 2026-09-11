@@ -1,26 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Problema #{{ problem.id }}{% endblock %}
+{% block title %}{{ problem.title }}{% endblock %}
 {% block content %}
 
 <h1>{{ problem.title }}</h1>
 <p class="sub">
-  {% if problem.category %}Categoria: <b>{{ problem.category }}</b>{% endif %}
-  {% if problem.difficulty %} · Difficoltà: <b>{{ problem.difficulty }}</b>{% endif %}
-  · Creato: {{ problem.created_at.strftime('%d/%m/%Y') }}
+  {% if problem.category %}{{ t.problem_category }}: <b>{{ problem.category }}</b>{% endif %}
+  {% if problem.difficulty %} · {{ t.problem_difficulty }}: <b>{{ problem.difficulty }}</b>{% endif %}
+  · {{ t.problem_created }}: {{ problem.created_at.strftime('%d/%m/%Y') }}
 </p>
 
 <div class="card">
-  <h3 style="margin-top:0">Testo del problema</h3>
+  <h3 style="margin-top:0">{{ t.problem_statement_h }}</h3>
   <div style="white-space:pre-wrap; line-height:1.7; padding:12px; background:var(--paper-2); border-radius:6px;">{{ problem.statement }}</div>
 </div>
 
-<h2>Soluzioni sottomesse ({{ subs|length }})</h2>
+<h2>{{ t.problem_subs_h }} ({{ subs|length }})</h2>
 
 {% if subs %}
 <div class="card" style="padding:0">
 <table>
   <thead><tr>
-    <th>#</th><th>Autore</th><th>Data</th><th>Punteggio</th><th>Verdetto</th><th>Stato</th>
+    <th>{{ t.table_id }}</th><th>{{ t.table_author }}</th><th>{{ t.table_date }}</th><th>{{ t.table_score }}</th><th>{{ t.table_verdict }}</th><th>{{ t.table_status }}</th>
   </tr></thead>
   <tbody>
   {% for s in subs %}
@@ -29,7 +29,7 @@
     <td><a href="{{ url_for('author_detail', name=s.author_name) }}">{{ s.author_name }}</a></td>
     <td>{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
     <td>{% if s.score is not none %}<b>{{ s.score }}</b>/100{% else %}—{% endif %}</td>
-    <td>{% if s.verdict %}<span class="badge verdict-{{ s.verdict.split(' ')[0].lower() }}">{{ s.verdict }}</span>{% endif %}</td>
+    <td>{% if s.verdict %}<span class="badge verdict-{{ verdict_class(s.verdict) }}">{{ s.verdict }}</span>{% endif %}</td>
     <td><span class="badge {{ s.status or 'pending' }}">{{ s.status or 'pending' }}</span></td>
   </tr>
   {% endfor %}
@@ -37,7 +37,7 @@
 </table>
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:40px; color:var(--muted);">Nessuna soluzione ancora.</div>
+<div class="card" style="text-align:center; padding:40px; color:var(--muted);">{{ t.no_subs }}</div>
 {% endif %}
 
 {% endblock %}

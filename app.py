@@ -46,8 +46,10 @@ CREATE TABLE IF NOT EXISTS submissions (
   image_data BYTEA NOT NULL,
   image_mimetype TEXT NOT NULL,
   image_size INT,
+  language TEXT NOT NULL DEFAULT 'it',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE submissions ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'it';
 
 CREATE TABLE IF NOT EXISTS markings (
   id SERIAL PRIMARY KEY,
@@ -85,36 +87,62 @@ ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY","")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY","")
 MODEL = os.environ.get("MARK_MODEL", "gemini-2.5-pro")
 
-MARKING_PROMPT = """Sei un esperto insegnante di matematica. Devi valutare la soluzione manoscritta di uno studente al problema qui sotto.
+SUPPORTED_LANGS = {"it", "en", "ru"}
 
-**Problema**:
+_LANG_SPEC = {
+    "it": {
+        "verdicts": ["corretta", "parzialmente corretta", "errata", "illeggibile"],
+        "confidences": ["alta", "media", "bassa"],
+        "instr": ("Sei un esperto insegnante di matematica. Valuta la soluzione manoscritta "
+                  "dello studente. Rispondi in italiano. La calligrafia potrebbe essere in "
+                  "qualsiasi lingua o notazione — leggi con attenzione."),
+    },
+    "en": {
+        "verdicts": ["correct", "partially correct", "wrong", "illegible"],
+        "confidences": ["high", "medium", "low"],
+        "instr": ("You are an expert math teacher. Grade the student's handwritten solution. "
+                  "Respond in English. The handwriting may be in any language or notation — "
+                  "read carefully."),
+    },
+    "ru": {
+        "verdicts": ["правильно", "частично правильно", "неверно", "нечитаемо"],
+        "confidences": ["высокая", "средняя", "низкая"],
+        "instr": ("Вы — опытный учитель математики. Оцените рукописное решение ученика. "
+                  "Отвечайте на русском языке. Почерк может быть на любом языке или в любой "
+                  "нотации — читайте внимательно."),
+    },
+}
+
+def build_marking_prompt(problem: str, lang: str) -> str:
+    spec = _LANG_SPEC.get(lang, _LANG_SPEC["it"])
+    verdicts = " | ".join(spec["verdicts"])
+    confidences = " | ".join(spec["confidences"])
+    return f"""{spec['instr']}
+
+**Problem** / **Problema** / **Задача**:
 {problem}
 
-**Istruzioni**:
-1. Leggi attentamente il problema.
-2. Analizza l'immagine della soluzione manoscritta dello studente.
-3. Identifica ogni passaggio della soluzione dello studente.
-4. Verifica la correttezza matematica di ciascun passaggio.
-5. Se la calligrafia è illeggibile in punti chiave, dillo esplicitamente.
-6. Rispondi SOLO con un oggetto JSON valido secondo lo schema richiesto, senza testo aggiuntivo prima o dopo.
+Return a single JSON object. `verdict_code` MUST be one of the canonical English codes
+`correct` / `partial` / `wrong` / `illegible`. The `verdict` field is the same meaning
+localized in the target language. All free-text fields (`strengths`, `errors`,
+`suggestions`, `overall_feedback`) MUST be written in the target language.
 
-**Schema JSON richiesto** (rispondi SOLO con questo JSON, nessun testo aggiuntivo):
-```json
+Schema:
 {{
   "score": <int 0-100>,
-  "verdict": "<uno tra: corretta, parzialmente corretta, errata, illeggibile>",
+  "verdict_code": "correct" | "partial" | "wrong" | "illegible",
+  "verdict": "<one of: {verdicts}>",
   "steps_correct": <int>,
   "steps_total": <int>,
-  "strengths": [<lista breve di punti positivi in italiano, max 3>],
-  "errors": [<lista di errori con posizione nella soluzione, max 5>],
-  "suggestions": [<lista di suggerimenti costruttivi in italiano, max 3>],
-  "final_answer_correct": <true|false|null se non presente>,
-  "confidence": <"alta"|"media"|"bassa" — quanto sei sicuro della lettura della calligrafia>,
-  "overall_feedback": "<2-3 frasi in italiano, tono incoraggiante ma onesto>"
+  "strengths": [<up to 3 short bullets, target language>],
+  "errors": [<up to 5 items with location in solution, target language>],
+  "suggestions": [<up to 3 constructive tips, target language>],
+  "final_answer_correct": <true | false | null>,
+  "confidence": "<one of: {confidences}>",
+  "overall_feedback": "<2-3 sentences, encouraging but honest, target language>"
 }}
-```
 
-Ricorda: rispondi SOLO con il JSON, senza wrappers markdown, senza spiegazioni aggiuntive."""
+Respond with ONLY the JSON object, no markdown fences, no extra text."""
 
 def _parse_json(raw: str):
     """Extract first {...} block from raw model output, stripping markdown fences."""
@@ -131,7 +159,7 @@ def _parse_json(raw: str):
         if m: return json.loads(m.group(0))
         raise
 
-def mark_solution_claude(problem_text, image_data, mimetype):
+def mark_solution_claude(problem_text, image_data, mimetype, lang="it"):
     if not ANTHROPIC_KEY:
         return {"error":"ANTHROPIC_API_KEY not set"}, 0, None, 0
     client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
@@ -142,7 +170,7 @@ def mark_solution_claude(problem_text, image_data, mimetype):
             model=MODEL, max_tokens=2000, temperature=0.2,
             messages=[{"role":"user","content":[
                 {"type":"image","source":{"type":"base64","media_type":mimetype,"data":b64}},
-                {"type":"text","text": MARKING_PROMPT.format(problem=problem_text)},
+                {"type":"text","text": build_marking_prompt(problem_text, lang)},
             ]}])
         latency = int((time.time()-t0)*1000)
         raw = "".join(b.text for b in msg.content if hasattr(b,"text"))
@@ -152,7 +180,7 @@ def mark_solution_claude(problem_text, image_data, mimetype):
     except Exception as e:
         return {"error": str(e)}, int((time.time()-t0)*1000), None, 0
 
-def mark_solution_gemini(problem_text, image_data, mimetype):
+def mark_solution_gemini(problem_text, image_data, mimetype, lang="it"):
     if not GEMINI_KEY:
         return {"error":"GEMINI_API_KEY not set"}, 0, None, 0
     import urllib.request
@@ -161,7 +189,7 @@ def mark_solution_gemini(problem_text, image_data, mimetype):
     body = json.dumps({
         "contents":[{"parts":[
             {"inline_data":{"mime_type":mimetype,"data":b64}},
-            {"text": MARKING_PROMPT.format(problem=problem_text)},
+            {"text": build_marking_prompt(problem_text, lang)},
         ]}],
         "generationConfig":{
             "temperature":0.2,
@@ -190,11 +218,245 @@ def mark_solution_gemini(problem_text, image_data, mimetype):
     except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}, int((time.time()-t0)*1000), None, 0
 
-def mark_solution(problem_text: str, image_data: bytes, mimetype: str):
+def mark_solution(problem_text: str, image_data: bytes, mimetype: str, lang: str = "it"):
     """Dispatch to Claude or Gemini based on MODEL env."""
     if MODEL.startswith("gemini"):
-        return mark_solution_gemini(problem_text, image_data, mimetype)
-    return mark_solution_claude(problem_text, image_data, mimetype)
+        return mark_solution_gemini(problem_text, image_data, mimetype, lang)
+    return mark_solution_claude(problem_text, image_data, mimetype, lang)
+
+# ────────────────────────────────────────────────────────
+# UI i18n
+# ────────────────────────────────────────────────────────
+UI_LANGS = ("en", "ru")
+UI_DEFAULT = "en"
+
+TEXT = {
+    "en": {
+        "html_lang": "en",
+        "brand_tail": "Mark",
+        "nav_recent": "Recent",
+        "nav_problems": "Problems",
+        "nav_new": "＋ New",
+        "footer": "MathMark · automated math solution grading",
+        "home_title": "Recent submissions",
+        "home_sub": "Handwritten math solutions, graded automatically.",
+        "stat_submissions": "Submissions",
+        "stat_problems": "Problems",
+        "stat_authors": "Authors",
+        "stat_avg": "Avg. score",
+        "table_id": "#",
+        "table_author": "Author",
+        "table_problem": "Problem",
+        "table_date": "Date",
+        "table_score": "Score",
+        "table_verdict": "Verdict",
+        "table_status": "Status",
+        "no_subs": "No submissions yet.",
+        "new_h1": "New submission",
+        "new_sub": "Photograph the solution, pick the problem (or create a new one), enter the author's name.",
+        "step_author": "1 · Author",
+        "author_label": "Name of the person who wrote the solution",
+        "author_ph": "e.g. Anna Ivanova",
+        "step_problem": "2 · Problem",
+        "reuse_problem": "Reuse problem",
+        "new_problem": "New problem",
+        "search_existing": "Search existing problems",
+        "search_ph": "Search by title or text…",
+        "no_problems": "No problems found.",
+        "title_label": "Problem title (optional)",
+        "title_ph": "e.g. Quadratic equation #1",
+        "statement_label": "Problem statement",
+        "statement_ph": "e.g. Solve: $x^2 - 5x + 6 = 0$\n\nHint: use inline LaTeX with $...$ and block with $$...$$",
+        "category_label": "Category (optional)",
+        "category_ph": "algebra, geometry, calculus…",
+        "difficulty_label": "Difficulty (optional)",
+        "diff_none": "—",
+        "diff_easy": "easy",
+        "diff_medium": "medium",
+        "diff_hard": "hard",
+        "diff_veryhard": "very hard",
+        "step_photo": "3 · Solution photo",
+        "photo_label": "Take or upload a photo",
+        "photo_hint": "Tip: make sure the writing is clear and well lit. Max 20 MB (jpg, png, webp).",
+        "step_lang": "4 · Grading language",
+        "lang_label": "Language of feedback",
+        "submit": "➤ Submit for grading",
+        "submitting": "⏳ Uploading + analysing…",
+        "err_author_missing": "Author name missing",
+        "err_image_missing": "Image missing",
+        "err_image_too_big": "Image too large (max 20 MB)",
+        "err_problem_not_found": "Problem not found",
+        "err_statement_missing": "Problem statement missing",
+        "sub_title": "Submission",
+        "sub_author": "Author",
+        "sub_problem": "Problem",
+        "sub_submitted": "Submitted",
+        "sub_image": "Handwritten solution",
+        "sub_marking": "Grading",
+        "pending_hint": "Grading in progress — this page will refresh automatically.",
+        "mark_score": "Score",
+        "mark_confidence": "Reading confidence:",
+        "mark_steps": "Correct steps:",
+        "mark_final": "Final answer:",
+        "mark_final_ok": "✓ correct",
+        "mark_final_bad": "✗ wrong",
+        "mark_strengths": "Strengths",
+        "mark_errors": "Errors found",
+        "mark_suggestions": "Suggestions",
+        "mark_model": "Model:",
+        "mark_failed": "Grading failed. Error:",
+        "problems_title": "Problem catalogue",
+        "problems_sub": "All problems previously submitted, with their attempt counts and average score.",
+        "problem_id": "#",
+        "problem_title_col": "Title",
+        "problem_category": "Category",
+        "problem_difficulty": "Difficulty",
+        "problem_subs": "Submissions",
+        "problem_avg": "Avg.",
+        "problem_created": "Created",
+        "problem_statement_h": "Problem statement",
+        "problem_subs_h": "Submitted solutions",
+        "author_stats_c": "Graded solutions:",
+        "author_stats_avg": "Average score:",
+        "author_history_h": "Solution history",
+        "verdict_correct": "correct",
+        "verdict_partial": "partially correct",
+        "verdict_wrong": "wrong",
+        "verdict_illegible": "illegible",
+    },
+    "ru": {
+        "html_lang": "ru",
+        "brand_tail": "Mark",
+        "nav_recent": "Последние",
+        "nav_problems": "Задачи",
+        "nav_new": "＋ Новое",
+        "footer": "MathMark · автоматическая проверка математических решений",
+        "home_title": "Последние работы",
+        "home_sub": "Рукописные решения по математике, оценённые автоматически.",
+        "stat_submissions": "Работ",
+        "stat_problems": "Задач",
+        "stat_authors": "Авторов",
+        "stat_avg": "Ср. балл",
+        "table_id": "№",
+        "table_author": "Автор",
+        "table_problem": "Задача",
+        "table_date": "Дата",
+        "table_score": "Балл",
+        "table_verdict": "Вердикт",
+        "table_status": "Статус",
+        "no_subs": "Пока нет работ.",
+        "new_h1": "Новая работа",
+        "new_sub": "Сфотографируйте решение, выберите задачу (или создайте новую), введите имя автора.",
+        "step_author": "1 · Автор",
+        "author_label": "Имя автора решения",
+        "author_ph": "Напр. Анна Иванова",
+        "step_problem": "2 · Задача",
+        "reuse_problem": "Использовать существующую",
+        "new_problem": "Новая задача",
+        "search_existing": "Поиск среди существующих задач",
+        "search_ph": "Поиск по названию или тексту…",
+        "no_problems": "Задачи не найдены.",
+        "title_label": "Название задачи (необязательно)",
+        "title_ph": "Напр. Квадратное уравнение №1",
+        "statement_label": "Условие задачи",
+        "statement_ph": "Напр.: Решите $x^2 - 5x + 6 = 0$\n\nПодсказка: используйте LaTeX через $...$ и $$...$$",
+        "category_label": "Раздел (необязательно)",
+        "category_ph": "алгебра, геометрия, анализ…",
+        "difficulty_label": "Сложность (необязательно)",
+        "diff_none": "—",
+        "diff_easy": "лёгкая",
+        "diff_medium": "средняя",
+        "diff_hard": "сложная",
+        "diff_veryhard": "очень сложная",
+        "step_photo": "3 · Фото решения",
+        "photo_label": "Сделайте или загрузите фото",
+        "photo_hint": "Совет: убедитесь, что запись чёткая и хорошо освещена. Макс. 20 МБ (jpg, png, webp).",
+        "step_lang": "4 · Язык проверки",
+        "lang_label": "Язык обратной связи",
+        "submit": "➤ Отправить на проверку",
+        "submitting": "⏳ Загрузка и проверка…",
+        "err_author_missing": "Не указано имя автора",
+        "err_image_missing": "Не приложено изображение",
+        "err_image_too_big": "Файл слишком большой (макс. 20 МБ)",
+        "err_problem_not_found": "Задача не найдена",
+        "err_statement_missing": "Отсутствует условие задачи",
+        "sub_title": "Работа",
+        "sub_author": "Автор",
+        "sub_problem": "Задача",
+        "sub_submitted": "Отправлено",
+        "sub_image": "Рукописное решение",
+        "sub_marking": "Проверка",
+        "pending_hint": "Идёт проверка — страница обновится автоматически.",
+        "mark_score": "Балл",
+        "mark_confidence": "Уверенность чтения:",
+        "mark_steps": "Верных шагов:",
+        "mark_final": "Итоговый ответ:",
+        "mark_final_ok": "✓ верный",
+        "mark_final_bad": "✗ неверный",
+        "mark_strengths": "Сильные стороны",
+        "mark_errors": "Найденные ошибки",
+        "mark_suggestions": "Рекомендации",
+        "mark_model": "Модель:",
+        "mark_failed": "Проверка не удалась. Ошибка:",
+        "problems_title": "Каталог задач",
+        "problems_sub": "Все задачи, отправленные ранее, с числом попыток и средним баллом.",
+        "problem_id": "№",
+        "problem_title_col": "Название",
+        "problem_category": "Раздел",
+        "problem_difficulty": "Сложность",
+        "problem_subs": "Работ",
+        "problem_avg": "Ср.",
+        "problem_created": "Создано",
+        "problem_statement_h": "Условие задачи",
+        "problem_subs_h": "Отправленные решения",
+        "author_stats_c": "Проверено решений:",
+        "author_stats_avg": "Средний балл:",
+        "author_history_h": "История решений",
+        "verdict_correct": "правильно",
+        "verdict_partial": "частично правильно",
+        "verdict_wrong": "неверно",
+        "verdict_illegible": "нечитаемо",
+    },
+}
+
+def current_lang():
+    q = (request.args.get("lang") or "").lower()
+    if q in UI_LANGS:
+        return q
+    c = (request.cookies.get("lang") or "").lower()
+    if c in UI_LANGS:
+        return c
+    return UI_DEFAULT
+
+_VERDICT_ALIAS = {
+    # Italian legacy
+    "corretta": "correct", "parzialmente": "partial", "errata": "wrong", "illeggibile": "illegible",
+    # English
+    "correct": "correct", "partial": "partial", "partially": "partial", "wrong": "wrong",
+    "incorrect": "wrong", "illegible": "illegible",
+    # Russian
+    "правильно": "correct", "верно": "correct", "частично": "partial",
+    "неверно": "wrong", "неправильно": "wrong", "нечитаемо": "illegible",
+}
+def verdict_class(v):
+    if not v: return ""
+    first = v.strip().split()[0].lower()
+    return _VERDICT_ALIAS.get(first, "")
+
+@app.context_processor
+def inject_i18n():
+    lang = current_lang()
+    return {"lang": lang, "t": TEXT[lang], "UI_LANGS": UI_LANGS, "verdict_class": verdict_class}
+
+@app.route("/lang/<code>")
+def set_lang(code):
+    code = code.lower()
+    if code not in UI_LANGS:
+        abort(404)
+    nxt = request.args.get("next") or url_for("home")
+    resp = redirect(nxt)
+    resp.set_cookie("lang", code, max_age=60*60*24*365, samesite="Lax")
+    return resp
 
 # ────────────────────────────────────────────────────────
 # Async marking worker
@@ -207,7 +469,7 @@ def process_submission(submission_id: int):
         conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT s.image_data, s.image_mimetype, p.statement
+                SELECT s.image_data, s.image_mimetype, s.language, p.statement
                 FROM submissions s JOIN problems p ON p.id = s.problem_id
                 WHERE s.id = %s
             """, (submission_id,))
@@ -216,8 +478,9 @@ def process_submission(submission_id: int):
             image = bytes(row["image_data"])
             mimetype = row["image_mimetype"]
             problem = row["statement"]
+            lang = row["language"] or "en"
 
-        data, latency_ms, raw, cost = mark_solution(problem, image, mimetype)
+        data, latency_ms, raw, cost = mark_solution(problem, image, mimetype, lang)
 
         with conn.cursor() as cur:
             if data.get("error"):
@@ -274,6 +537,8 @@ def home():
 @app.route("/new", methods=["GET","POST"])
 def new():
     conn = get_conn()
+    ui_lang = current_lang()
+    tt = TEXT[ui_lang]
     if request.method == "POST":
         author = request.form.get("author_name","").strip()
         problem_id = request.form.get("problem_id","").strip()
@@ -281,13 +546,15 @@ def new():
         problem_statement = request.form.get("problem_statement","").strip()
         problem_category = request.form.get("problem_category","").strip() or None
         problem_difficulty = request.form.get("problem_difficulty","").strip() or None
+        lang = (request.form.get("language","").strip().lower() or ui_lang)
+        if lang not in SUPPORTED_LANGS: lang = ui_lang if ui_lang in SUPPORTED_LANGS else "en"
         image = request.files.get("image")
 
-        if not author: return "Nome autore mancante", 400
-        if not image or not image.filename: return "Immagine mancante", 400
+        if not author: return tt["err_author_missing"], 400
+        if not image or not image.filename: return tt["err_image_missing"], 400
 
         image_bytes = image.read()
-        if len(image_bytes) > 20*1024*1024: return "Immagine troppo grande (max 20MB)", 400
+        if len(image_bytes) > 20*1024*1024: return tt["err_image_too_big"], 400
         mimetype = image.mimetype or "image/jpeg"
         if mimetype not in ("image/jpeg","image/png","image/webp","image/gif"):
             mimetype = "image/jpeg"
@@ -295,19 +562,19 @@ def new():
         with conn.cursor() as cur:
             if problem_id:
                 cur.execute("SELECT id FROM problems WHERE id=%s", (int(problem_id),))
-                if not cur.fetchone(): return "Problema non trovato", 400
+                if not cur.fetchone(): return tt["err_problem_not_found"], 400
                 pid = int(problem_id)
             else:
-                if not problem_statement: return "Testo del problema mancante", 400
+                if not problem_statement: return tt["err_statement_missing"], 400
                 cur.execute("""INSERT INTO problems (title, statement, category, difficulty)
                                VALUES (%s,%s,%s,%s) RETURNING id""",
                             (problem_title or problem_statement[:80],
                              problem_statement, problem_category, problem_difficulty))
                 pid = cur.fetchone()["id"]
 
-            cur.execute("""INSERT INTO submissions (problem_id, author_name, image_data, image_mimetype, image_size)
-                           VALUES (%s,%s,%s,%s,%s) RETURNING id""",
-                        (pid, author, image_bytes, mimetype, len(image_bytes)))
+            cur.execute("""INSERT INTO submissions (problem_id, author_name, image_data, image_mimetype, image_size, language)
+                           VALUES (%s,%s,%s,%s,%s,%s) RETURNING id""",
+                        (pid, author, image_bytes, mimetype, len(image_bytes), lang))
             sid = cur.fetchone()["id"]
             cur.execute("""INSERT INTO markings (submission_id, model, status)
                            VALUES (%s,%s,'pending')""", (sid, MODEL))
