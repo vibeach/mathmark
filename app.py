@@ -495,6 +495,10 @@ TEXT = {
         "copy_link": "Copy link",
         "copied": "Copied!",
         "no_results_for_filter": "No submissions match the current filter.",
+        "sort_label": "Sort",
+        "sort_recent": "Newest",
+        "sort_score_desc": "Highest score",
+        "sort_score_asc": "Lowest score",
     },
     "ru": {
         "html_lang": "ru",
@@ -617,6 +621,10 @@ TEXT = {
         "copy_link": "Копировать ссылку",
         "copied": "Скопировано!",
         "no_results_for_filter": "Нет работ, соответствующих фильтру.",
+        "sort_label": "Сортировка",
+        "sort_recent": "Новые",
+        "sort_score_desc": "Высокий балл",
+        "sort_score_asc": "Низкий балл",
     },
 }
 
@@ -852,6 +860,9 @@ def submissions_index():
     verdict = request.args.get("verdict","").strip()  # canonical: correct|partial|wrong|illegible
     status = request.args.get("status","").strip()    # pending|done|failed
     lang_f = request.args.get("submission_lang","").strip()
+    sort = request.args.get("sort","recent").strip()
+    if sort not in ("recent","score_desc","score_asc"):
+        sort = "recent"
     page = max(1, int(request.args.get("page", 1) or 1))
     per_page = 25
     where = ["1=1"]
@@ -890,6 +901,11 @@ def submissions_index():
             WHERE {where_sql}
         """, params)
         total = cur.fetchone()["c"]
+        order_sql = {
+            "recent": "s.id DESC",
+            "score_desc": "m.score DESC NULLS LAST, s.id DESC",
+            "score_asc": "m.score ASC NULLS LAST, s.id DESC",
+        }[sort]
         cur.execute(f"""
             SELECT s.id, s.author_name, s.created_at, s.language,
                    p.title AS problem_title,
@@ -898,7 +914,7 @@ def submissions_index():
             JOIN problems p ON p.id=s.problem_id
             LEFT JOIN markings m ON m.submission_id=s.id
             WHERE {where_sql}
-            ORDER BY s.id DESC
+            ORDER BY {order_sql}
             LIMIT %s OFFSET %s
         """, params + [per_page, (page-1)*per_page])
         subs = cur.fetchall()
@@ -908,7 +924,7 @@ def submissions_index():
     return render_template("submissions.html",
         subs=subs, authors=authors,
         q=q, author=author, verdict=verdict, status=status, submission_lang=lang_f,
-        page=page, pages=pages, total=total)
+        sort=sort, page=page, pages=pages, total=total)
 
 @app.route("/problems")
 def problems_index():

@@ -48,6 +48,14 @@
         <option value="it" {% if submission_lang=='it' %}selected{% endif %}>IT</option>
       </select>
     </div>
+    <div>
+      <label>{{ t.sort_label }}</label>
+      <select name="sort">
+        <option value="recent" {% if sort=='recent' %}selected{% endif %}>{{ t.sort_recent }}</option>
+        <option value="score_desc" {% if sort=='score_desc' %}selected{% endif %}>{{ t.sort_score_desc }}</option>
+        <option value="score_asc" {% if sort=='score_asc' %}selected{% endif %}>{{ t.sort_score_asc }}</option>
+      </select>
+    </div>
   </div>
   <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
     <button type="submit" class="btn">{{ t.subs_apply }}</button>
@@ -105,7 +113,7 @@
 
 {% if pages > 1 %}
 <div style="margin-top:24px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-  {% set qs = 'q=' ~ q|urlencode ~ '&author=' ~ author|urlencode ~ '&verdict=' ~ verdict ~ '&status=' ~ status ~ '&submission_lang=' ~ submission_lang %}
+  {% set qs = 'q=' ~ q|urlencode ~ '&author=' ~ author|urlencode ~ '&verdict=' ~ verdict ~ '&status=' ~ status ~ '&submission_lang=' ~ submission_lang ~ '&sort=' ~ sort %}
   <div>
     {% if page > 1 %}<a class="btn ghost" href="?{{ qs }}&page={{ page-1 }}">{{ t.subs_prev }}</a>{% endif %}
   </div>
