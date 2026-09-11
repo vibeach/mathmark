@@ -49,7 +49,18 @@
 <div style="margin-top:16px;">
   <h4 style="color:var(--danger); font-family:-apple-system,sans-serif; font-size:12px; letter-spacing:.24em; text-transform:uppercase; margin-bottom:8px;">{{ t.mark_errors }}</h4>
   <ul style="padding-left:20px; margin:0;">
-    {% for e in fb.errors %}<li style="margin:4px 0;">{% if e is mapping %}{% if e.step %}<code>{{ e.step }}</code> — {% endif %}{{ e.explanation or e }}{% else %}{{ e }}{% endif %}</li>{% endfor %}
+    {% for e in fb.errors %}
+      <li style="margin:6px 0;">
+      {% if e is mapping %}
+        {% set loc = e.step or e.location or e.where or '' %}
+        {% set txt = e.explanation or e.description or e.detail or e.message or '' %}
+        {% if loc %}<code style="background:var(--paper-2); padding:1px 5px; border-radius:3px; font-size:12px;">{{ loc }}</code> — {% endif %}
+        {{ txt }}
+      {% else %}
+        {{ e }}
+      {% endif %}
+      </li>
+    {% endfor %}
   </ul>
 </div>
 {% endif %}

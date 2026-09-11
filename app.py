@@ -134,9 +134,13 @@ Schema:
   "verdict": "<one of: {verdicts}>",
   "steps_correct": <int>,
   "steps_total": <int>,
-  "strengths": [<up to 3 short bullets, target language>],
-  "errors": [<up to 5 items with location in solution, target language>],
-  "suggestions": [<up to 3 constructive tips, target language>],
+  "strengths": [<up to 3 short strings, target language>],
+  "errors": [
+    {{"step": "<the exact step or expression where the error is, verbatim from the image>",
+      "explanation": "<one short sentence in the target language>"}},
+    ...up to 5
+  ],
+  "suggestions": [<up to 3 short strings, target language>],
   "final_answer_correct": <true | false | null>,
   "confidence": "<one of: {confidences}>",
   "overall_feedback": "<2-3 sentences, encouraging but honest, target language>"
