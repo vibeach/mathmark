@@ -22,10 +22,12 @@
   {% endif %}
 </div>
 
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;" class="grid-detail">
+<div class="grid-detail">
   <div class="card">
     <h3 style="margin-top:0">{{ t.sub_image }}</h3>
-    <img src="{{ url_for('submission_image', sid=sub.id) }}" style="width:100%; border-radius:6px; border:1px solid var(--line);">
+    <a href="{{ url_for('submission_image', sid=sub.id) }}" target="_blank">
+      <img src="{{ url_for('submission_image', sid=sub.id) }}" style="width:100%; border-radius:6px; border:1px solid var(--line); display:block;">
+    </a>
     <div class="sub" style="margin-top:8px;">{{ (sub.image_size or 0)/1024 | round(1) }} KB · {{ sub.image_mimetype }}</div>
   </div>
 
@@ -53,7 +55,8 @@
 
 <style>
   @keyframes spin { to { transform: rotate(360deg); } }
-  @media (max-width:800px) { .grid-detail { grid-template-columns:1fr; } }
+  .grid-detail { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width:800px) { .grid-detail { grid-template-columns: 1fr; } }
 </style>
 
 {% endblock %}
