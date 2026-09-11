@@ -12,9 +12,34 @@
   <div class="stat"><div class="n">{{ avg or "–" }}</div><div class="l">{{ t.stat_avg }}</div></div>
 </div>
 
+{% if tally %}
+<div class="tally">
+  {% for code in ['correct','partial','wrong','illegible'] %}
+    {% if tally.get(code) %}
+    <a class="tally-item" href="{{ url_for('submissions_index', verdict=code) }}">
+      <span class="badge verdict-{{ code }}">{{ t['verdict_' ~ code] }}</span>
+      <b>{{ tally[code] }}</b>
+    </a>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
 <div style="margin:24px 0">
   <a href="{{ url_for('new') }}" class="btn gold">{{ t.nav_new }}</a>
 </div>
+
+<style>
+.tally { display:flex; gap:10px; flex-wrap:wrap; margin:16px 0; }
+.tally-item {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 14px; background:#fff; border:1px solid var(--line);
+  border-radius:8px; color:var(--ink); text-decoration:none;
+  transition:border-color .12s, transform .12s;
+}
+.tally-item:hover { border-color:var(--brand); transform:translateY(-1px); text-decoration:none; }
+.tally-item b { font-family:Georgia,serif; font-size:18px; color:var(--brand); }
+</style>
 
 {% if subs %}
 <div class="card" style="padding:0">

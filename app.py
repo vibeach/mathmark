@@ -733,7 +733,22 @@ def home():
         cur.execute("SELECT COUNT(*) c FROM problems"); n_probs = cur.fetchone()["c"]
         cur.execute("SELECT COUNT(DISTINCT author_name) c FROM submissions"); n_auth = cur.fetchone()["c"]
         cur.execute("SELECT AVG(score)::int a FROM markings WHERE status='done'"); avg = cur.fetchone()["a"]
-    return render_template("home.html", subs=subs, n_subs=n_subs, n_probs=n_probs, n_auth=n_auth, avg=avg)
+        cur.execute("""
+            SELECT
+              COALESCE(feedback_json->>'verdict_code',
+                CASE
+                  WHEN LOWER(SPLIT_PART(COALESCE(verdict,''),' ',1)) IN ('corretta','correct','правильно','верно') THEN 'correct'
+                  WHEN LOWER(SPLIT_PART(COALESCE(verdict,''),' ',1)) IN ('parzialmente','partial','partially','частично') THEN 'partial'
+                  WHEN LOWER(SPLIT_PART(COALESCE(verdict,''),' ',1)) IN ('errata','wrong','incorrect','неверно','неправильно') THEN 'wrong'
+                  WHEN LOWER(SPLIT_PART(COALESCE(verdict,''),' ',1)) IN ('illeggibile','illegible','нечитаемо') THEN 'illegible'
+                END) AS vc,
+              COUNT(*) c
+            FROM markings WHERE status='done'
+            GROUP BY vc
+        """)
+        tally = {r["vc"]: r["c"] for r in cur.fetchall() if r["vc"]}
+    return render_template("home.html", subs=subs, n_subs=n_subs, n_probs=n_probs,
+                           n_auth=n_auth, avg=avg, tally=tally)
 
 @app.route("/new", methods=["GET","POST"])
 def new():
