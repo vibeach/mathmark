@@ -89,6 +89,28 @@ def init_db():
 _RECOVERY_LOCK = threading.Lock()
 _RECOVERED = False
 
+# Per-IP rate limiter for POST /new — soft cap to keep costs sane.
+_RATE_LOCK = threading.Lock()
+_RATE_BUCKET: dict[str, list[float]] = {}
+RATE_WINDOW_SEC = 3600
+RATE_MAX = int(os.environ.get("RATE_MAX_PER_HOUR", "20"))
+
+def rate_check(ip: str) -> tuple[bool, int]:
+    now = time.time()
+    with _RATE_LOCK:
+        hits = _RATE_BUCKET.get(ip, [])
+        hits = [t for t in hits if now - t < RATE_WINDOW_SEC]
+        if len(hits) >= RATE_MAX:
+            _RATE_BUCKET[ip] = hits
+            return False, int(RATE_WINDOW_SEC - (now - hits[0]))
+        hits.append(now)
+        _RATE_BUCKET[ip] = hits
+        return True, 0
+
+def client_ip():
+    return (request.headers.get("X-Forwarded-For","").split(",")[0].strip()
+            or request.remote_addr or "unknown")
+
 def recover_stalled_markings():
     """On startup, re-kick any marking that's been pending too long.
 
@@ -419,6 +441,7 @@ TEXT = {
         "regrade_btn": "Re-grade",
         "regrade_confirm": "Re-run grading on this solution?",
         "regrade_running": "Re-grading…",
+        "err_rate_limit": "Too many submissions. Try again in",
     },
     "ru": {
         "html_lang": "ru",
@@ -534,6 +557,7 @@ TEXT = {
         "regrade_btn": "Проверить снова",
         "regrade_confirm": "Запустить проверку заново?",
         "regrade_running": "Проверка…",
+        "err_rate_limit": "Слишком много запросов. Попробуйте через",
     },
 }
 
@@ -668,6 +692,10 @@ def new():
         if lang not in SUPPORTED_LANGS: lang = ui_lang if ui_lang in SUPPORTED_LANGS else "en"
         image = request.files.get("image")
 
+        ok, retry = rate_check(client_ip())
+        if not ok:
+            mins = max(1, retry // 60)
+            return (f"{tt['err_rate_limit']} ({mins} min)", 429)
         if not author: return tt["err_author_missing"], 400
         if not image or not image.filename: return tt["err_image_missing"], 400
 
