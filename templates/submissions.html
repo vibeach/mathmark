@@ -61,16 +61,21 @@
   {% set fb = s.feedback_json or {} %}
   {% set vcode = fb.verdict_code or verdict_class(s.verdict) %}
   <a class="sub-card" href="{{ url_for('submission_detail', sid=s.id) }}">
-    <div class="sc-head">
-      <div class="sc-id">#{{ s.id }}</div>
-      <div class="sc-score {% if s.score is not none %}{% if s.score < 50 %}low{% elif s.score < 75 %}mid{% else %}high{% endif %}{% endif %}">
-        {{ s.score if s.score is not none else "–" }}<span class="sub" style="font-size:12px;">/100</span>
+    <div class="sc-top">
+      <img class="sc-thumb" src="{{ url_for('submission_image', sid=s.id) }}" alt="" loading="lazy">
+      <div class="sc-top-right">
+        <div class="sc-head">
+          <div class="sc-id">#{{ s.id }}</div>
+          <div class="sc-score {% if s.score is not none %}{% if s.score < 50 %}low{% elif s.score < 75 %}mid{% else %}high{% endif %}{% endif %}">
+            {{ s.score if s.score is not none else "–" }}<span class="sub" style="font-size:12px;">/100</span>
+          </div>
+        </div>
+        <div class="sc-meta">
+          <span class="sub">{{ s.author_name }}</span><br>
+          <span class="sub">{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
+          · <span class="badge lang-badge">{{ (s.language or 'en').upper() }}</span>
+        </div>
       </div>
-    </div>
-    <div class="sc-meta">
-      <span class="sub">{{ s.author_name }}</span> ·
-      <span class="sub">{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</span>
-      · <span class="badge lang-badge">{{ (s.language or 'en').upper() }}</span>
     </div>
     <div class="sc-title">{{ s.problem_title|truncate(90) }}</div>
     <div class="sc-tags">
@@ -110,6 +115,12 @@
   box-shadow: 0 1px 2px rgba(0,0,0,.03);
 }
 .sub-card:hover { border-color:var(--brand); box-shadow: 0 4px 12px rgba(26,47,107,.12); text-decoration:none; }
+.sc-top { display:flex; gap:12px; align-items:flex-start; }
+.sc-thumb {
+  width:80px; height:80px; object-fit:cover; border-radius:6px;
+  border:1px solid var(--line); flex-shrink:0; background:var(--paper-2);
+}
+.sc-top-right { flex:1; min-width:0; }
 .sc-head { display:flex; justify-content:space-between; align-items:baseline; }
 .sc-id { font-family:-apple-system,sans-serif; font-size:12px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); }
 .sc-score { font-family:Georgia,serif; font-size:26px; font-weight:700; color:var(--brand); line-height:1; }

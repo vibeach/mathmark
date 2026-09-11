@@ -51,7 +51,10 @@
       {% elif mark.status == 'failed' %}
       <div style="padding:20px; background:#fee2e2; color:#991b1b; border-radius:6px;">
         <b>{{ t.mark_failed }}</b>
-        <div style="margin-top:6px; font-size:13px;">{{ mark.error }}</div>
+        <div style="margin-top:6px; font-size:13px; opacity:.85;">{{ mark.error }}</div>
+        <div style="margin-top:14px;">
+          <button type="button" class="btn" id="regrade-btn-failed" style="background:#991b1b;">&#x21bb; {{ t.regrade_btn }}</button>
+        </div>
       </div>
       {% else %}
         {% include "_mark_result.html" %}
@@ -87,8 +90,7 @@ async function poll() {
 poll();
 {% endif %}
 
-const rg = document.getElementById("regrade-btn");
-if (rg) {
+document.querySelectorAll("#regrade-btn, #regrade-btn-failed").forEach(rg => {
   rg.addEventListener("click", async () => {
     if (!confirm({{ t.regrade_confirm|tojson }})) return;
     rg.disabled = true;
@@ -100,6 +102,6 @@ if (rg) {
     rg.disabled = false;
     rg.textContent = {{ t.regrade_btn|tojson }};
   });
-}
+});
 </script>
 {% endblock %}
