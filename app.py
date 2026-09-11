@@ -346,6 +346,9 @@ TEXT = {
         "st_pending": "pending",
         "st_done": "done",
         "st_failed": "failed",
+        "regrade_btn": "Re-grade",
+        "regrade_confirm": "Re-run grading on this solution?",
+        "regrade_running": "Re-grading…",
     },
     "ru": {
         "html_lang": "ru",
@@ -458,6 +461,9 @@ TEXT = {
         "st_pending": "в ожидании",
         "st_done": "готово",
         "st_failed": "ошибка",
+        "regrade_btn": "Проверить снова",
+        "regrade_confirm": "Запустить проверку заново?",
+        "regrade_running": "Проверка…",
     },
 }
 
@@ -787,6 +793,27 @@ def api_problems():
         else:
             cur.execute("SELECT id, title, statement FROM problems ORDER BY id DESC LIMIT 20")
         return jsonify([dict(r) for r in cur.fetchall()])
+
+@app.route("/submission/<int:sid>/regrade", methods=["POST"])
+def submission_regrade(sid):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM submissions WHERE id=%s", (sid,))
+        if not cur.fetchone(): abort(404)
+        cur.execute("SELECT status FROM markings WHERE submission_id=%s", (sid,))
+        m = cur.fetchone()
+        if m and m["status"] == "pending":
+            return jsonify({"ok": False, "reason": "already pending"}), 409
+        cur.execute("""INSERT INTO markings (submission_id, model, status)
+                       VALUES (%s,%s,'pending')
+                       ON CONFLICT (submission_id) DO UPDATE
+                       SET status='pending', error=NULL, score=NULL, verdict=NULL,
+                           feedback_json=NULL, raw_response=NULL, latency_ms=NULL,
+                           cost_usd=NULL, updated_at=NOW(), model=EXCLUDED.model""",
+                    (sid, MODEL))
+        conn.commit()
+    kick_worker(sid)
+    return jsonify({"ok": True})
 
 @app.route("/api/mark_status/<int:sid>")
 def api_mark_status(sid):
