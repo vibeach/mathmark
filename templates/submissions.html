@@ -90,7 +90,17 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="card" style="text-align:center; padding:40px; color:var(--muted);">{{ t.no_subs }}</div>
+<div class="card" style="text-align:center; padding:40px; color:var(--muted);">
+  {% if q or author or verdict or status or submission_lang %}
+    {{ t.no_results_for_filter }}
+    <br><br>
+    <a href="{{ url_for('submissions_index') }}" class="btn ghost">{{ t.subs_reset }}</a>
+  {% else %}
+    {{ t.no_subs }}
+    <br><br>
+    <a href="{{ url_for('new') }}" class="btn">{{ t.nav_new }}</a>
+  {% endif %}
+</div>
 {% endif %}
 
 {% if pages > 1 %}

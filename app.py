@@ -462,6 +462,7 @@ TEXT = {
         "err_statement_too_long": "Problem statement too long (max 4000 chars)",
         "copy_link": "Copy link",
         "copied": "Copied!",
+        "no_results_for_filter": "No submissions match the current filter.",
     },
     "ru": {
         "html_lang": "ru",
@@ -583,6 +584,7 @@ TEXT = {
         "err_statement_too_long": "Условие задачи слишком длинное (макс. 4000 симв.)",
         "copy_link": "Копировать ссылку",
         "copied": "Скопировано!",
+        "no_results_for_filter": "Нет работ, соответствующих фильтру.",
     },
 }
 
