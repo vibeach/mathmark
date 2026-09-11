@@ -29,7 +29,7 @@
     <td><a href="{{ url_for('submission_detail', sid=s.id) }}">#{{ s.id }}</a></td>
     <td><a href="{{ url_for('author_detail', name=s.author_name) }}">{{ s.author_name }}</a></td>
     <td>{{ s.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
-    <td>{% if s.score is not none %}<b>{{ s.score }}</b>/100{% else %}—{% endif %}</td>
+    <td class="nowrap">{% if s.score is not none %}<b>{{ s.score }}</b>/100{% else %}—{% endif %}</td>
     <td>{% if s.verdict %}<span class="badge verdict-{{ verdict_class(s.verdict) }}">{{ s.verdict }}</span>{% endif %}</td>
     <td><span class="badge {{ s.status or 'pending' }}">{{ s.status or 'pending' }}</span></td>
   </tr>

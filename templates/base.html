@@ -79,7 +79,8 @@
   table { width:100%; border-collapse:collapse; margin-top:8px; }
   th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:top; }
   th { font-family:-apple-system,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); font-weight:600; }
-  td.wrap-cell { max-width:220px; overflow-wrap:anywhere; }
+  td.wrap-cell { max-width:220px; overflow-wrap:break-word; word-break:normal; }
+  td.nowrap { white-space:nowrap; }
   .badge {
     display:inline-block; padding:3px 10px; font-size:11px; font-weight:600;
     border-radius:4px; letter-spacing:.05em; font-family:-apple-system,sans-serif;

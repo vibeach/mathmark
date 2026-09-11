@@ -21,7 +21,7 @@
     <td>{{ p.category or "—" }}</td>
     <td>{{ p.difficulty or "—" }}</td>
     <td>{{ p.sub_count }}</td>
-    <td>{% if p.avg_score is not none %}<b>{{ p.avg_score }}</b>/100{% else %}—{% endif %}</td>
+    <td class="nowrap">{% if p.avg_score is not none %}<b>{{ p.avg_score }}</b>/100{% else %}—{% endif %}</td>
   </tr>
   {% endfor %}
   </tbody>
